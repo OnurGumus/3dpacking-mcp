@@ -1,0 +1,44 @@
+{
+  "name": "@3dpacking/mcp-server",
+  "version": "0.1.0",
+  "description": "Container and truck load planning for AI assistants. Describe a shipment in plain English, get back the containers it fits in and a link to the 3D load plan.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "3dpacking-mcp": "src/index.js"
+  },
+  "main": "src/index.js",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "container-loading",
+    "load-planning",
+    "bin-packing",
+    "3d-bin-packing",
+    "logistics",
+    "freight",
+    "shipping",
+    "cargo",
+    "claude",
+    "chatgpt"
+  ],
+  "homepage": "https://3dpack.ing",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/onurgumus/3dpacking-mcp"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "smoke": "node src/smoke.js"
+  }
+}
