@@ -1,6 +1,6 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "com.3dpack/container-loading",
+  "name": "ing.3dpack/container-loading",
   "title": "3DPACK.ING — Container & Truck Load Planning",
   "description": "Plain-English shipment input for freight & logistics: containers your cargo fits, 3D load plan.",
   "version": "0.1.0",
