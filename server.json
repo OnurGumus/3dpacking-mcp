@@ -3,7 +3,7 @@
   "name": "ing.3dpack/container-loading",
   "title": "3DPACK.ING — Container & Truck Load Planning",
   "description": "Plain-English shipment input for freight & logistics: containers your cargo fits, 3D load plan.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "websiteUrl": "https://3dpack.ing",
   "repository": {
     "url": "https://github.com/OnurGumus/3dpacking-mcp",
@@ -13,7 +13,7 @@
     {
       "registryType": "npm",
       "identifier": "@3dpacking/mcp-server",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "transport": {
         "type": "stdio"
       }
