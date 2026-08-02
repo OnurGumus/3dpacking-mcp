@@ -1,2 +1,5 @@
 node_modules/
 *.log
+
+# Ed25519 private key for MCP registry DNS auth. Never commit.
+key.pem
