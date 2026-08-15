@@ -1,0 +1,47 @@
+# Smithery configuration file: https://smithery.ai/docs/config#smitheryyaml
+#
+# Published to the official MCP registry as `ing.3dpack/container-loading` on
+# 2 August 2026, and reachable from nowhere else for the fortnight after. The
+# registry is not where anyone browses; Smithery, mcp.so and PulseMCP are, and none
+# of them indexed this without a manifest here.
+#
+# `required: []` is the point of this file, not an oversight. The server runs against
+# a shared demo account on the free plan when no key is set, so a listing that opens
+# with a credential prompt would hide the one property worth advertising: it works on
+# the first call, with no account. Both credentials are optional and must be supplied
+# together -- the API rejects a key without the username it belongs to -- which
+# JSON Schema cannot express in a way Smithery's form honours, so the descriptions
+# carry it instead.
+
+startCommand:
+  type: stdio
+  configSchema:
+    # JSON Schema defining the configuration options for the MCP.
+    type: object
+    required: []
+    properties:
+      apiKey:
+        type: string
+        title: API key
+        description: >-
+          Optional. Leave blank to run against a shared demo account on the free
+          plan. Set this to bill against your own limits, and set username too --
+          the API rejects a key without the account it belongs to. Get one at
+          https://3dpack.ing/login
+      username:
+        type: string
+        title: Username
+        description: >-
+          Optional, and required whenever apiKey is set: the account the key
+          belongs to.
+      endpoint:
+        type: string
+        title: Endpoint override
+        description: >-
+          Optional. Point at staging, a self-hosted instance or a stub. Defaults to
+          the production solver.
+  commandFunction:
+    # A function that produces the CLI command to start the MCP on stdio.
+    |-
+    (config) => ({ command: 'node', args: ['src/index.js'], env: { ...(config.apiKey ? { THREEDPACKING_API_KEY: config.apiKey } : {}), ...(config.username ? { THREEDPACKING_USERNAME: config.username } : {}), ...(config.endpoint ? { THREEDPACKING_ENDPOINT: config.endpoint } : {}) } })
+  exampleConfig: {}
