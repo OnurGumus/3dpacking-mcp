@@ -49,6 +49,50 @@ export function credentialsFromEnv(env = process.env) {
 }
 
 /**
+ * Credentials for a hosted caller, from the query string or headers.
+ *
+ * The environment is one user for the life of a process, which is right for stdio and
+ * wrong for an endpoint serving everybody. Three shapes are accepted because three
+ * shapes are what clients send:
+ *
+ *   ?config=<base64 json>            Smithery's, and the reason this is not just query params
+ *   ?apiKey=…&username=…             plain query, what a person testing with curl writes
+ *   X-3dpacking-Api-Key / -Username  headers, for anyone who would rather not put a key in a URL
+ *
+ * Same fallback rule as the environment: half a credential becomes the demo pair
+ * rather than an obscure 400, because a first call that works is the whole point.
+ */
+export function credentialsFromConfig(searchParams, headers = {}) {
+  let fromConfigParam = {};
+  const encoded = searchParams?.get?.("config");
+
+  if (encoded) {
+    try {
+      // base64url as well as base64: Smithery sends the former and atob-style decoders
+      // reject it, which fails as "no credentials" rather than as anything diagnosable.
+      const json = Buffer.from(encoded, "base64").toString("utf8");
+      const parsed = JSON.parse(json);
+      if (parsed && typeof parsed === "object") fromConfigParam = parsed;
+    } catch {
+      // A malformed config is not worth failing the session over -- it falls through
+      // to the demo pair, which is the same place no config at all lands.
+    }
+  }
+
+  const pick = (configKey, queryKey, headerKey) =>
+    (fromConfigParam[configKey] ?? searchParams?.get?.(queryKey) ?? headers[headerKey])
+      ?.toString()
+      .trim() || undefined;
+
+  const apiKey = pick("apiKey", "apiKey", "x-3dpacking-api-key");
+  const username = pick("username", "username", "x-3dpacking-username");
+
+  if (apiKey && username) return { apiKey, username, isDemo: false };
+
+  return { ...DEMO_CREDENTIALS, isDemo: true };
+}
+
+/**
  * Why a call failed, in terms the caller can act on.
  *
  * `plan_limit` is the one that matters. The API reports a plan limitation as HTTP

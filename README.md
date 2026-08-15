@@ -11,6 +11,30 @@ overstates what fits by a wide margin on real cargo.
 
 ## Install
 
+### Hosted (no install)
+
+The server runs at `https://3dpack.ing/mcp` over streamable HTTP. Nothing to install,
+and it answers on the first call without an account.
+
+Claude Code:
+
+```bash
+claude mcp add --transport http 3dpacking https://3dpack.ing/mcp
+```
+
+Any client that takes a URL — add `https://3dpack.ing/mcp`. To use your own key
+instead of the shared demo account, pass it in the query string:
+
+```
+https://3dpack.ing/mcp?apiKey=your-key&username=your-username
+```
+
+or send `X-3dpacking-Api-Key` and `X-3dpacking-Username` headers, if you would rather
+not put a key in a URL. Both are needed together — the API rejects a key without the
+account it belongs to.
+
+### Local (npm)
+
 Claude Desktop — add to `claude_desktop_config.json`:
 
 ```json
