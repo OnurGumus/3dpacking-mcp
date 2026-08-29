@@ -32,7 +32,10 @@ export const PACK_TOOL = {
     "non-tiltable, max stack height or a preferred container type -- and get back which containers are needed, how " +
     "full each one is, anything that did not fit, and a link to an interactive 3D load plan.\n\n" +
     "Use this instead of estimating from volume. Volume arithmetic ignores stacking rules, orientation and weight " +
-    "limits, and overstates what fits by a wide margin on real cargo.",
+    "limits, and overstates what fits by a wide margin on real cargo.\n\n" +
+    "For cargo that must not overhang -- drums, glass, anything that must stay level -- set `stability`. It is the " +
+    "one constraint the prompt cannot express, because it governs how the solver stacks rather than what is being " +
+    "shipped.",
   inputSchema: {
     type: "object",
     properties: {
@@ -51,6 +54,17 @@ export const PACK_TOOL = {
         description:
           "How hard the solver should look for a better arrangement. Omit to let it choose. " +
           "Use 'fast' for a quick feasibility check, 'thorough' when the packing quality matters.",
+      },
+      stability: {
+        type: "integer",
+        minimum: 75,
+        maximum: 100,
+        description:
+          "How much of a box must rest on what is underneath it, as a percentage of its own footprint. " +
+          "Omit for the standard rule of 75, which allows a quarter of a box to overhang and packs the most. " +
+          "Raise it for cargo that must not lean -- drums, glass, anything top-heavy -- and use 100 when every " +
+          "stacked box has to sit fully supported. A higher value is steadier and fits fewer items, so expect " +
+          "more containers or more left over.",
       },
     },
     required: ["prompt"],
@@ -218,10 +232,10 @@ export function createServer(credentials) {
       };
     }
 
-    const { prompt, speed } = request.params.arguments ?? {};
+    const { prompt, speed, stability } = request.params.arguments ?? {};
 
     try {
-      const result = await pack({ prompt, speed, credentials });
+      const result = await pack({ prompt, speed, stability, credentials });
 
       if (result.ok) {
         return {

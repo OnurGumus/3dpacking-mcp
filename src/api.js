@@ -204,7 +204,7 @@ export function normaliseResultUrl(url) {
  * a reasonable question, and the tool has something useful to say about each.
  * Genuine transport faults still throw.
  */
-export async function pack({ prompt, speed, credentials, fetchImpl = fetch, timeoutMs = 120000 }) {
+export async function pack({ prompt, speed, stability, credentials, fetchImpl = fetch, timeoutMs = 120000 }) {
   const trimmed = String(prompt ?? "").trim();
   if (!trimmed) {
     return {
@@ -219,6 +219,10 @@ export async function pack({ prompt, speed, credentials, fetchImpl = fetch, time
     username: credentials.username,
   };
   if (speed) body.speed = speed;
+  // Passed through unvalidated on purpose. The packer refuses anything outside
+  // 75..100 with a message rather than clamping it, and relaying that refusal is
+  // more use to a caller than a second opinion here that could drift from it.
+  if (stability !== undefined && stability !== null) body.stability = stability;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);

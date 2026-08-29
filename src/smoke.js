@@ -91,5 +91,49 @@ if (multi.ok) {
   );
 }
 
+// Stability is a solver setting rather than a description, so the only proof it is
+// wired is that the same shipment answers differently at the two ends of the range.
+// 100 demands every stacked box sit fully on what is under it, so it can only ever
+// seat the same or fewer -- if the two packs are identical the parameter is being
+// dropped somewhere between here and the engine, which is exactly how `speed` was
+// advertised and inert for months.
+const steady = await pack({
+  prompt: "Pack 50 boxes of 60x40x30 cm into a 20ft container",
+  stability: 100,
+  credentials,
+});
+
+check("stability=100 is accepted", steady.ok, steady.ok ? "" : JSON.stringify(steady.failure));
+
+if (steady.ok && single.ok) {
+  const loose = single.data.containers[0]?.itemsLoaded ?? 0;
+  const strict = steady.data.containers[0]?.itemsLoaded ?? 0;
+  check(
+    "stability=100 never seats more than the default rule",
+    strict <= loose,
+    `75 seated ${loose}, 100 seated ${strict}`,
+  );
+}
+
+// Out of range falls back to the documented default rather than being clamped to the
+// nearest legal value: 50 is not "as loose as possible", it is a caller asking for
+// something the schema never published, and answering it with the standard rule is
+// the one behaviour that cannot silently pack to a rule nobody asked for.
+const outOfRange = await pack({
+  prompt: "Pack 50 boxes of 60x40x30 cm into a 20ft container",
+  stability: 50,
+  credentials,
+});
+
+check("an out-of-range stability still packs", outOfRange.ok, outOfRange.ok ? "" : JSON.stringify(outOfRange.failure));
+
+if (outOfRange.ok && single.ok) {
+  check(
+    "an out-of-range stability falls back to the default rule",
+    (outOfRange.data.containers[0]?.itemsLoaded ?? -1) === (single.data.containers[0]?.itemsLoaded ?? -2),
+    `default seated ${single.data.containers[0]?.itemsLoaded}, 50 seated ${outOfRange.data.containers[0]?.itemsLoaded}`,
+  );
+}
+
 console.log(failures === 0 ? "\nAll checks passed.\n" : `\n${failures} check(s) failed.\n`);
 process.exit(failures === 0 ? 0 : 1);
