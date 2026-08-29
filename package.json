@@ -1,6 +1,6 @@
 {
   "name": "@3dpacking/mcp-server",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Container and truck load planning for AI assistants. Describe a shipment in plain English, get back the containers it fits in and a link to the 3D load plan.",
   "license": "MIT",
   "type": "module",

@@ -78,7 +78,15 @@ Both must be set together — the API rejects a key without a username.
 ## The tool
 
 **`pack_shipment`** — one required argument, `prompt`, describing the cargo in plain
-English, and an optional `speed` of `fast`, `normal` or `thorough`.
+English, and two optional settings: a `speed` of `fast`, `normal` or `thorough`, and a
+`stability` of 75 to 100.
+
+`stability` is how much of a box must rest on what is underneath it, as a percentage of
+its own footprint. Omit it for 75, the standard rule, which lets a quarter of a box
+overhang and packs the most. Raise it for cargo that must not lean — drums, glass,
+anything top-heavy — and use 100 when every stacked box has to sit fully supported. It
+is the one constraint the prompt cannot carry, because it governs how the solver stacks
+rather than what is being shipped, and a higher value fits fewer items.
 
 Things it understands:
 

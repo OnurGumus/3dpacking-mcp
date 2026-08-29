@@ -21,7 +21,7 @@ import {
 
 import { pack, SIGNUP_URL, UPGRADE_URL } from "./api.js";
 
-export const SERVER_INFO = { name: "3dpacking", version: "0.2.0" };
+export const SERVER_INFO = { name: "3dpacking", version: "0.3.0" };
 
 export const PACK_TOOL = {
   name: "pack_shipment",
@@ -129,8 +129,9 @@ function renderSuccess(data, { truncated }, credentials, noticeState) {
     lines.push(
       "",
       "---",
-      "This ran on the shared demo account, which is on the free plan: single-container packs only, " +
-        `and a limited number per month. For your own key and higher limits, sign up at ${SIGNUP_URL} ` +
+      "This ran on the shared demo account, which everybody trying this server shares. It packs up to " +
+        "500 boxes at a time, and what else it will do depends on the allowance left on it that day, so " +
+        `treat it as a trial rather than as a plan. For limits of your own, sign up at ${SIGNUP_URL} ` +
         "and set THREEDPACKING_API_KEY and THREEDPACKING_USERNAME.",
     );
   }
@@ -148,14 +149,22 @@ function renderFailure(failure, credentials) {
         `That pack needs a paid plan: ${failure.detail}`,
         "",
         credentials.isDemo
-          ? "This ran on the shared demo account, which is on the free plan. Multi-container optimisation, " +
-            "larger shipments and higher monthly limits are on the paid plans."
+          ? "This ran on the shared demo account, whose allowance is shared with everyone else trying this " +
+            "server. A key of your own gets your plan's limits instead."
           : "The account this key belongs to is on the free plan.",
         "",
         `Plans and upgrade: ${UPGRADE_URL}`,
-        "",
-        "In the meantime, this will work if you pack into a single named container -- " +
-          'for example "into a 40ft high cube" rather than "the best mix of 40ft and 20ft".',
+        // Only when the refusal was actually about several containers. It used to be
+        // offered for every plan limit, which sent a caller who had been refused for
+        // sending too many boxes off to rewrite a container choice that was never the
+        // problem.
+        ...(/container/i.test(failure.detail ?? "")
+          ? [
+              "",
+              "In the meantime, this will work if you pack into a single named container -- " +
+                'for example "into a 40ft high cube" rather than "the best mix of 40ft and 20ft".',
+            ]
+          : []),
       ].join("\n");
 
     case "rejected_or_out_of_credit":
