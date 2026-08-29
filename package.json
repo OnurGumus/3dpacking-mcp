@@ -32,7 +32,7 @@
   "homepage": "https://3dpack.ing",
   "repository": {
     "type": "git",
-    "url": "https://github.com/onurgumus/3dpacking-mcp"
+    "url": "git+https://github.com/onurgumus/3dpacking-mcp.git"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0"
