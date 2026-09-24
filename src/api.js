@@ -59,6 +59,12 @@ export function credentialsFromEnv(env = process.env) {
  *   ?apiKey=…&username=…             plain query, what a person testing with curl writes
  *   X-3dpacking-Api-Key / -Username  headers, for anyone who would rather not put a key in a URL
  *
+ * The key is also read from `X-API-Key` and `Authorization: Bearer …`. Claude's
+ * custom-connector dialog only sends header names Anthropic has approved, and
+ * `X-3dpacking-Api-Key` is not one of them -- saving it is refused outright. Those two
+ * are on the list. The username has no approved header to ride in, and it is not a
+ * secret, so a connector puts it in the URL (`?username=…`) and the key in a header.
+ *
  * Same fallback rule as the environment: half a credential becomes the demo pair
  * rather than an obscure 400, because a first call that works is the whole point.
  */
@@ -84,12 +90,32 @@ export function credentialsFromConfig(searchParams, headers = {}) {
       ?.toString()
       .trim() || undefined;
 
-  const apiKey = pick("apiKey", "apiKey", "x-3dpacking-api-key");
+  const apiKey =
+    pick("apiKey", "apiKey", "x-3dpacking-api-key") ??
+    (headers["x-api-key"]?.toString().trim() || undefined) ??
+    bearerToken(headers.authorization);
   const username = pick("username", "username", "x-3dpacking-username");
 
   if (apiKey && username) return { apiKey, username, isDemo: false };
 
   return { ...DEMO_CREDENTIALS, isDemo: true };
+}
+
+/**
+ * The token from an `Authorization` header, with or without the `Bearer` scheme.
+ *
+ * Claude sends the value exactly as typed and adds no scheme, so a bare key is as
+ * likely to arrive as a proper `Bearer <key>`. Any other scheme -- Basic, say -- is
+ * not a key and is ignored rather than guessed at.
+ */
+function bearerToken(header) {
+  const value = header?.toString().trim();
+  if (!value) return undefined;
+
+  const match = value.match(/^Bearer\s+(\S+)$/i);
+  if (match) return match[1];
+
+  return /\s/.test(value) ? undefined : value;
 }
 
 /**

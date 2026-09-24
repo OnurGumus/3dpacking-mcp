@@ -33,6 +33,15 @@ or send `X-3dpacking-Api-Key` and `X-3dpacking-Username` headers, if you would r
 not put a key in a URL. Both are needed together — the API rejects a key without the
 account it belongs to.
 
+Claude (claude.ai custom connectors) only sends approved header names, so there the
+key goes in `X-API-Key` (or `Authorization: Bearer your-key`) and the username stays
+in the URL:
+
+```
+URL:     https://3dpack.ing/mcp?username=your-username
+Header:  X-API-Key: your-key
+```
+
 ### Local (npm)
 
 Claude Desktop — add to `claude_desktop_config.json`:

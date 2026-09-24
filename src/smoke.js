@@ -9,7 +9,7 @@
  *   node src/smoke.js
  */
 
-import { credentialsFromEnv, pack, normaliseResultUrl, classifyFailure } from "./api.js";
+import { credentialsFromConfig, credentialsFromEnv, pack, normaliseResultUrl, classifyFailure } from "./api.js";
 
 let failures = 0;
 
@@ -43,6 +43,38 @@ check(
   "empty prompt is refused before it reaches the network",
   (await pack({ prompt: "   ", credentials: { apiKey: "x", username: "y" } })).failure.kind ===
     "bad_request",
+);
+
+const query = (s) => new URLSearchParams(s);
+
+check(
+  "a connector's X-API-Key header pairs with ?username",
+  credentialsFromConfig(query("username=a@b.c"), { "x-api-key": "k1" }).apiKey === "k1",
+);
+
+check(
+  "Authorization: Bearer carries the key",
+  credentialsFromConfig(query("username=a@b.c"), { authorization: "Bearer k2" }).apiKey === "k2",
+);
+
+check(
+  "a bare Authorization value carries the key too",
+  credentialsFromConfig(query("username=a@b.c"), { authorization: "k3" }).apiKey === "k3",
+);
+
+check(
+  "Basic auth is not mistaken for a key",
+  credentialsFromConfig(query("username=a@b.c"), { authorization: "Basic eDp5" }).isDemo,
+);
+
+check(
+  "the query-string key still wins over a header",
+  credentialsFromConfig(query("apiKey=q&username=a@b.c"), { "x-api-key": "h" }).apiKey === "q",
+);
+
+check(
+  "a key with no username still falls back to the demo pair",
+  credentialsFromConfig(query(""), { "x-api-key": "k1" }).isDemo,
 );
 
 // --- live ------------------------------------------------------------------
