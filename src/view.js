@@ -6,8 +6,12 @@
  * result into it. A host that does not support them never asks, and the text answer
  * with its link is the whole of the reply -- which is why the text stays complete.
  *
- * The view frames https://3dpack.ing/app?g=<id>&embed=viewer. `frameDomains` is what
- * permits that: the sandbox refuses every nested frame the resource does not declare.
+ * The view draws the load itself, with Three.js from jsDelivr (`resourceDomains`).
+ * It first framed the site's own viewer (`/app?g=<id>&embed=viewer`), which is the
+ * better picture -- but claude.ai ignores `frameDomains` and pins `frame-src 'self'
+ * blob: data:`, so the nested frame was refused (anthropics/claude-ai-mcp#40, still
+ * open in Sept 2026). `resourceDomains` is honoured. If that ever changes, framing
+ * the real viewer is the upgrade.
  */
 
 import { readFileSync } from "node:fs";
@@ -32,7 +36,7 @@ export const viewContents = () => ({
       text: html,
       _meta: {
         ui: {
-          csp: { frameDomains: ["https://3dpack.ing"] },
+          csp: { resourceDomains: ["https://cdn.jsdelivr.net"] },
           prefersBorder: true,
         },
       },

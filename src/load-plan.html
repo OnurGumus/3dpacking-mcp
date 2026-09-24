@@ -2,18 +2,19 @@
 <!--
   The 3D load plan, inside the chat -- an MCP App view (text/html;profile=mcp-app).
 
-  Claude renders this in a sandboxed iframe under the pack_shipment answer. It frames
-  the real viewer, 3dpack.ing/app?g=<id>&embed=viewer, rather than a copy of it: the
-  site's viewer is years of rendering work, and a second one here would drift from it
-  the first time either changed. The resource declares https://3dpack.ing in
-  csp.frameDomains, which is the only reason the nested frame is allowed at all.
+  Claude renders this in a sandboxed iframe under the pack_shipment answer and pushes
+  the tool result into it. The placements arrive in the result's `_meta`
+  ("ing.3dpack/plan"), which the host gives the view and not the model; this page
+  draws them with Three.js from jsDelivr, the one origin the resource declares.
 
-  The protocol is written by hand -- a dozen lines of postMessage -- rather than
-  bundled from @modelcontextprotocol/ext-apps, so this stays one file with nothing to
-  build and nothing to load from a CDN the sandbox would also have to allow.
+  It is not the site's viewer. That was the first attempt -- this page framed
+  3dpack.ing/app?g=<id>&embed=viewer -- and claude.ai refused the frame: it ignores
+  csp.frameDomains and pins frame-src to 'self' blob: data: (claude-ai-mcp#40). So
+  this is a plain picture of the same placements, and "Open full plan" is the way to
+  the real one.
 
-  "Open full plan" goes through ui/open-link, not a target=_blank link: the sandbox
-  decides whether this frame may open windows, and the host is the one that can.
+  The host protocol is written by hand -- initialize, tool-result, size-changed,
+  open-link -- so the page is one file with nothing to build.
 -->
 <html lang="en">
 <head>
@@ -27,6 +28,7 @@
     --muted: #6d6a64;
     --line: rgba(29, 29, 27, .14);
     --ground: #efede8;
+    --bar: #f7f6f2;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
@@ -34,6 +36,7 @@
       --muted: #a29f98;
       --line: rgba(236, 235, 232, .16);
       --ground: #22211f;
+      --bar: #1a1918;
     }
   }
   :root[data-theme="dark"] {
@@ -41,6 +44,7 @@
     --muted: #a29f98;
     --line: rgba(236, 235, 232, .16);
     --ground: #22211f;
+    --bar: #1a1918;
   }
   /* The attribute has to win over the display rules below, or a hidden element shows. */
   [hidden] { display: none !important; }
@@ -53,14 +57,19 @@
   .bar {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 12px;
     height: 40px;
     padding: 0 12px;
     border-bottom: 1px solid var(--line);
+    /* Its own ground rather than the host's: the host's theme and this page's can
+       disagree for a moment, and text on a transparent bar is then unreadable. */
+    background: var(--bar);
   }
-  .title { font-weight: 600; }
+  .title { font-weight: 600; white-space: nowrap; }
   .title span { color: var(--muted); font-weight: 400; }
+  .pager { display: flex; align-items: center; gap: 6px; color: var(--muted); margin-left: auto; }
+  .bar > button { margin-left: auto; }
+  .pager:not([hidden]) + button { margin-left: 0; }
   button {
     font: inherit;
     color: inherit;
@@ -71,101 +80,325 @@
     cursor: pointer;
   }
   button:hover { border-color: var(--muted); }
+  .pager button { padding: 2px 8px; }
   .stage {
     position: relative;
     height: 420px;
     background: var(--ground);
+    overflow: hidden;
+    touch-action: none;
   }
-  iframe {
-    display: block;
-    width: 100%;
-    height: 100%;
-    border: 0;
-  }
-  .wait {
+  .stage canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+  .stage canvas:active { cursor: grabbing; }
+  .note {
     position: absolute;
     inset: 0;
     display: grid;
     place-items: center;
+    padding: 24px;
+    text-align: center;
     color: var(--muted);
+  }
+  .legend {
+    position: absolute;
+    left: 10px;
+    bottom: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    max-width: calc(100% - 20px);
+    font-size: 12px;
+    color: var(--muted);
+    pointer-events: none;
+  }
+  .legend i {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    margin-right: 5px;
+    border-radius: 2px;
+    vertical-align: -1px;
   }
 </style>
 </head>
 <body>
   <div class="bar">
     <div class="title">3D load plan <span>· drag to turn, scroll to zoom</span></div>
+    <div class="pager" id="pager" hidden>
+      <button id="prev" type="button" aria-label="Previous container">‹</button>
+      <span id="which"></span>
+      <button id="next" type="button" aria-label="Next container">›</button>
+    </div>
     <button id="open" type="button" hidden>Open full plan ↗</button>
   </div>
-  <div class="stage">
-    <div class="wait" id="wait">Packing…</div>
-    <iframe id="plan" title="3D load plan" hidden></iframe>
+  <div class="stage" id="stage">
+    <div class="note" id="note">Packing…</div>
+    <div class="legend" id="legend"></div>
   </div>
-<script>
-  // Everything the page's size is made of: the bar plus the stage. Reported to the
-  // host so the frame is sized to this rather than to a guess.
+<script type="module">
+  // Everything the page's size is made of: the bar plus the stage and its border.
   const HEIGHT = 461;
-  const ORIGIN = "https://3dpack.ing";
+  const THREE_URL = "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js";
 
-  const wait = document.getElementById("wait");
-  const plan = document.getElementById("plan");
-  const open = document.getElementById("open");
+  // Muted, and distinct from each other in both themes. One colour per kind of piece.
+  const PALETTE = ["#c9a86a", "#7fa38a", "#8aa3bf", "#c98b73", "#a99bc4", "#b8b27a", "#7fb3b0", "#c7a0a8"];
+
+  const $ = (id) => document.getElementById(id);
+  const stage = $("stage"), note = $("note"), legend = $("legend");
+  const pager = $("pager"), which = $("which"), open = $("open");
+
+  // --- host protocol --------------------------------------------------------
 
   let nextId = 1;
   const pending = new Map();
-  let fullPlanUrl = null;
-
   const send = (message) => window.parent.postMessage(message, "*");
-
   const request = (method, params) =>
     new Promise((resolve, reject) => {
       const id = nextId++;
       pending.set(id, { resolve, reject });
       send({ jsonrpc: "2.0", id, method, params });
     });
-
   const notify = (method, params) => send({ jsonrpc: "2.0", method, params });
+
+  const say = (text) => {
+    note.textContent = text;
+    note.hidden = false;
+  };
+
+  // --- state ------------------------------------------------------------------
+
+  let plan = null;
+  let fullPlanUrl = null;
+  let index = 0;
+  let THREE = null;
+  let gl = null; // { renderer, scene, camera, root }
+
+  const isDark = () =>
+    document.documentElement.dataset.theme === "dark" ||
+    (!document.documentElement.dataset.theme && matchMedia("(prefers-color-scheme: dark)").matches);
 
   const applyTheme = (context) => {
     if (context && (context.theme === "light" || context.theme === "dark")) {
       document.documentElement.dataset.theme = context.theme;
+      if (gl && plan) draw();
     }
   };
 
-  // Only ever a 3dpack.ing plan. The URL arrives from the tool result, and a frame
-  // pointed anywhere else would be this page lending its place in the chat to it.
-  const isPlan = (url) => {
-    try {
-      const parsed = new URL(url);
-      return parsed.origin === ORIGIN && parsed.pathname === "/app" && parsed.searchParams.has("g");
-    } catch {
-      return false;
+  // --- camera, orbiting the load ---------------------------------------------
+
+  // Starts from above the open door, to one side: the view a loader has.
+  const orbit = { theta: 0.75, phi: 1.0, radius: 1000, x: 0, y: 0, z: 0 };
+  let frameQueued = false;
+
+  const render = () => {
+    frameQueued = false;
+    const { camera, renderer, scene } = gl;
+    const { theta, phi, radius } = orbit;
+    camera.position.set(
+      orbit.x + radius * Math.sin(phi) * Math.sin(theta),
+      orbit.y + radius * Math.cos(phi),
+      orbit.z + radius * Math.sin(phi) * Math.cos(theta),
+    );
+    camera.lookAt(orbit.x, orbit.y, orbit.z);
+    renderer.render(scene, camera);
+  };
+  const queue = () => {
+    if (!frameQueued) {
+      frameQueued = true;
+      requestAnimationFrame(render);
     }
   };
 
-  const show = (result) => {
-    const structured = (result && result.structuredContent) || {};
-    let full = structured.resultUrl;
+  const resize = () => {
+    if (!gl) return;
+    const w = stage.clientWidth, h = stage.clientHeight;
+    gl.renderer.setSize(w, h, false);
+    gl.camera.aspect = w / h;
+    gl.camera.updateProjectionMatrix();
+    queue();
+  };
 
-    // Older servers, or a host that drops structuredContent: the link is in the text.
-    if (!full) {
+  function setUp() {
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    stage.insertBefore(renderer.domElement, legend);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(35, 1, 1, 200000);
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8478, 1.6));
+    const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+    sun.position.set(0.5, 1, 0.8);
+    scene.add(sun);
+
+    gl = { renderer, scene, camera, root: null };
+
+    const canvas = renderer.domElement;
+    let drag = null;
+    canvas.addEventListener("pointerdown", (e) => {
+      drag = { x: e.clientX, y: e.clientY };
+      canvas.setPointerCapture(e.pointerId);
+    });
+    canvas.addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      orbit.theta -= (e.clientX - drag.x) * 0.008;
+      orbit.phi = Math.min(1.52, Math.max(0.12, orbit.phi - (e.clientY - drag.y) * 0.008));
+      drag = { x: e.clientX, y: e.clientY };
+      queue();
+    });
+    const release = () => (drag = null);
+    canvas.addEventListener("pointerup", release);
+    canvas.addEventListener("pointercancel", release);
+    canvas.addEventListener(
+      "wheel",
+      (e) => {
+        e.preventDefault();
+        orbit.radius = Math.min(orbit.max, Math.max(orbit.min, orbit.radius * Math.exp(e.deltaY * 0.001)));
+        queue();
+      },
+      { passive: false },
+    );
+
+    new ResizeObserver(resize).observe(stage);
+    resize();
+  }
+
+  // --- the load ----------------------------------------------------------------
+
+  const dispose = (object) =>
+    object.traverse((o) => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) o.material.dispose();
+    });
+
+  function draw() {
+    const { scene } = gl;
+    if (gl.root) {
+      scene.remove(gl.root);
+      dispose(gl.root);
+    }
+
+    const container = plan.containers[index];
+    const { width: W, height: H, length: L } = container;
+    const dark = isDark();
+    const root = new THREE.Group();
+
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(W, L),
+      new THREE.MeshLambertMaterial({ color: dark ? 0x3a3935 : 0xdcd8cf }),
+    );
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.set(W / 2, 0, L / 2);
+    root.add(floor);
+
+    const shell = new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.BoxGeometry(W, H, L)),
+      new THREE.LineBasicMaterial({ color: dark ? 0xb9b5ab : 0x5b5850 }),
+    );
+    shell.position.set(W / 2, H / 2, L / 2);
+    root.add(shell);
+
+    // One geometry and one material per kind, shared by every box of that kind.
+    const unit = new THREE.BoxGeometry(1, 1, 1);
+    const unitEdges = new THREE.EdgesGeometry(unit);
+    const materials = plan.groups.map((_, g) => new THREE.MeshLambertMaterial({ color: PALETTE[g % PALETTE.length] }));
+    const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: dark ? 0.45 : 0.28 });
+    // Past this many, an outline per box costs more than it shows.
+    const outlines = container.items.length <= 2000;
+
+    const counts = new Map();
+    for (const [x, y, z, w, h, l, g] of container.items) {
+      const box = new THREE.Mesh(unit, materials[g]);
+      box.scale.set(w, h, l);
+      box.position.set(x + w / 2, y + h / 2, z + l / 2);
+      root.add(box);
+      if (outlines) {
+        const edges = new THREE.LineSegments(unitEdges, edgeMaterial);
+        edges.scale.copy(box.scale);
+        edges.position.copy(box.position);
+        root.add(edges);
+      }
+      counts.set(g, (counts.get(g) || 0) + 1);
+    }
+
+    scene.add(root);
+    gl.root = root;
+
+    // Framed so the whole container fits, whichever way it is turned.
+    const reach = Math.sqrt(W * W + H * H + L * L) / 2;
+    const fit = reach / Math.sin((gl.camera.fov * Math.PI) / 360);
+    Object.assign(orbit, { x: W / 2, y: H / 2.5, z: L / 2, radius: fit, min: reach * 0.6, max: fit * 3 });
+
+    legend.innerHTML = "";
+    for (const [g, n] of counts) {
+      const entry = document.createElement("span");
+      const swatch = document.createElement("i");
+      swatch.style.background = PALETTE[g % PALETTE.length];
+      // The parser usually names a kind by its size already ("Boxes 60x40x50").
+      const { name, size } = plan.groups[g];
+      entry.append(swatch, `${/\d/.test(name) ? name : `${name} ${size}`} ×${n}`);
+      legend.append(entry);
+    }
+
+    const many = plan.containers.length > 1;
+    pager.hidden = !many;
+    which.textContent = `Container ${index + 1} of ${plan.containers.length}`;
+
+    queue();
+  }
+
+  $("prev").addEventListener("click", () => {
+    index = (index - 1 + plan.containers.length) % plan.containers.length;
+    draw();
+  });
+  $("next").addEventListener("click", () => {
+    index = (index + 1) % plan.containers.length;
+    draw();
+  });
+
+  // --- the tool result -----------------------------------------------------------
+
+  async function show(result) {
+    const meta = (result && result._meta) || {};
+    fullPlanUrl = meta["ing.3dpack/resultUrl"] || null;
+
+    // A host that drops `_meta`: the link is still in the text.
+    if (!fullPlanUrl) {
       const text = ((result && result.content) || []).map((c) => c.text || "").join("\n");
       const match = text.match(/https:\/\/3dpack\.ing\/app\?g=[0-9a-f-]+/i);
-      full = match && match[0];
+      fullPlanUrl = match ? match[0] : null;
     }
+    open.hidden = !fullPlanUrl;
 
-    if (!full || !isPlan(full)) {
-      wait.textContent = "No 3D plan came back for this answer.";
+    plan = meta["ing.3dpack/plan"] || null;
+    if (!plan || !plan.containers || !plan.containers.length) {
+      say(
+        fullPlanUrl
+          ? "The 3D view here comes with your own API key. Open the full plan to see this load."
+          : "No 3D plan came back for this answer.",
+      );
       return;
     }
 
-    const viewer = new URL(full);
-    viewer.searchParams.set("embed", "viewer");
-    fullPlanUrl = full;
-    plan.src = viewer.toString();
-    plan.hidden = false;
-    wait.hidden = true;
-    open.hidden = false;
-  };
+    if (!THREE) {
+      try {
+        THREE = await import(THREE_URL);
+      } catch {
+        say("The 3D view could not load here. Open the full plan to see this load.");
+        return;
+      }
+    }
+
+    try {
+      if (!gl) setUp();
+    } catch {
+      say("This browser cannot draw 3D here. Open the full plan to see this load.");
+      return;
+    }
+
+    note.hidden = true;
+    index = 0;
+    draw();
+  }
 
   window.addEventListener("message", (event) => {
     if (event.source !== window.parent) return;
@@ -203,7 +436,7 @@
 
   request("ui/initialize", {
     protocolVersion: "2026-01-26",
-    appInfo: { name: "3dpacking-load-plan", version: "1.0.0" },
+    appInfo: { name: "3dpacking-load-plan", version: "1.1.0" },
     appCapabilities: { availableDisplayModes: ["inline"] },
   }).then((result) => {
     applyTheme(result && result.hostContext);

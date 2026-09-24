@@ -9,7 +9,7 @@
  *   node src/smoke.js
  */
 
-import { credentialsFromConfig, credentialsFromEnv, pack, normaliseResultUrl, classifyFailure } from "./api.js";
+import { credentialsFromConfig, credentialsFromEnv, pack, normaliseResultUrl, classifyFailure, planForView } from "./api.js";
 import { PACK_TOOL } from "./server.js";
 import { VIEW_URI, viewContents } from "./view.js";
 
@@ -86,9 +86,28 @@ check("pack_shipment names the 3D view for MCP Apps hosts", PACK_TOOL._meta?.ui?
 check("the view is served as an MCP App", view.mimeType === "text/html;profile=mcp-app" && view.text.includes("ui/initialize"));
 
 check(
-  "the view may frame 3dpack.ing and nothing else",
-  JSON.stringify(view._meta.ui.csp.frameDomains) === JSON.stringify(["https://3dpack.ing"]),
+  "the view may load scripts from jsDelivr and nothing else",
+  JSON.stringify(view._meta.ui.csp) === JSON.stringify({ resourceDomains: ["https://cdn.jsdelivr.net"] }),
 );
+
+{
+  const plan = planForView([
+    {
+      containerDims: { length: 589.28, width: 235, height: 239 },
+      items: [
+        { name: "Boxes", length: 50, width: 100, height: 200, x: 0, y: 0, z: 0 },
+        { name: "Boxes", length: 100, width: 50, height: 200, x: 100, y: 0, z: 0 },
+        { name: "Boxes", length: 40, width: 60, height: 150, x: 160, y: 0, z: 50 },
+      ],
+    },
+  ]);
+  check(
+    "placements compact to [x, y, z, width, height, length, group]",
+    JSON.stringify(plan.containers[0].items[0]) === JSON.stringify([0, 0, 0, 100, 200, 50, 0]),
+  );
+  check("a turned piece stays in its own kind's group", plan.containers[0].items[1][6] === 0 && plan.groups.length === 2);
+  check("no placements means no plan, not an empty one", planForView([{ containerDims: {}, items: [] }]) === null);
+}
 
 // --- live ------------------------------------------------------------------
 

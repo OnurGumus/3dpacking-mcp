@@ -274,9 +274,13 @@ export function createServer(credentials, keySetup = KEY_SETUP_ENV) {
       if (result.ok) {
         return {
           content: [{ type: "text", text: renderSuccess(result.data, result, credentials, noticeState, keySetup) }],
-          // For the 3D view, which frames this plan. Not for the model: the text
-          // above already carries the link.
-          ...(result.data.resultUrl ? { structuredContent: { resultUrl: result.data.resultUrl } } : {}),
+          // For the 3D view only. `_meta` reaches the view and not the model --
+          // `structuredContent` would reach both, and a large load's placements are
+          // thousands of numbers no answer needs. The text above carries the link.
+          _meta: {
+            "ing.3dpack/resultUrl": result.data.resultUrl,
+            ...(result.data.plan ? { "ing.3dpack/plan": result.data.plan } : {}),
+          },
         };
       }
 

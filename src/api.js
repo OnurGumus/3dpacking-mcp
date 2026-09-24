@@ -206,6 +206,45 @@ export function summarise(payload) {
     // a link pasted into a chat resolves without one.
     resultUrl: normaliseResultUrl(payload.linkToResult),
     everythingFits: unpackedTotal === 0 && containers.length > 0,
+    plan: planForView(containers),
+  };
+}
+
+/**
+ * The placements, compacted for the 3D view and for nothing else -- it travels in the
+ * result's `_meta`, which the host hands to the view and not to the model.
+ *
+ * Axes as the API reports them: x across the width, y up, z along the length. Each
+ * item is `[x, y, z, width, height, length, group]`, rounded to a millimetre; a group
+ * is one kind of piece -- a name and a size, whichever way it was turned -- so one
+ * colour means one kind of piece. Null when the API sent no placements (the demo
+ * account, or an older server), which the view reads as "link only".
+ */
+export function planForView(containers) {
+  if (!containers.some((c) => Array.isArray(c.items) && c.items.length)) return null;
+
+  const r = (n) => Math.round((Number(n) || 0) * 10) / 10;
+  const groups = [];
+  const groupIndex = new Map();
+
+  const groupOf = (item) => {
+    const sides = [item.length, item.width, item.height].map(r).sort((a, b) => b - a);
+    const key = `${item.name}|${sides.join("x")}`;
+    if (!groupIndex.has(key)) {
+      groupIndex.set(key, groups.length);
+      groups.push({ name: item.name || "Item", size: sides.join(" × ") });
+    }
+    return groupIndex.get(key);
+  };
+
+  return {
+    groups,
+    containers: containers.map((c) => ({
+      length: r(c.containerDims?.length),
+      width: r(c.containerDims?.width),
+      height: r(c.containerDims?.height),
+      items: (c.items ?? []).map((i) => [r(i.x), r(i.y), r(i.z), r(i.width), r(i.height), r(i.length), groupOf(i)]),
+    })),
   };
 }
 
@@ -230,7 +269,22 @@ export function normaliseResultUrl(url) {
  * a reasonable question, and the tool has something useful to say about each.
  * Genuine transport faults still throw.
  */
-export async function pack({ prompt, speed, stability, credentials, fetchImpl = fetch, timeoutMs = 120000 }) {
+/**
+ * `coordinates` asks the API for every placement, which only the 3D view uses -- the
+ * text answer is built from the summary either way. The shared demo account is
+ * refused placements by design (the API answers 402 before spending anything), so it
+ * never asks; and should some other key be refused the same way, the pack is simply
+ * repeated without them rather than failed over a picture.
+ */
+export async function pack({
+  prompt,
+  speed,
+  stability,
+  credentials,
+  fetchImpl = fetch,
+  timeoutMs = 120000,
+  coordinates = !credentials.isDemo,
+}) {
   const trimmed = String(prompt ?? "").trim();
   if (!trimmed) {
     return {
@@ -256,7 +310,8 @@ export async function pack({ prompt, speed, stability, credentials, fetchImpl = 
   let response;
   let text;
   try {
-    response = await fetchImpl(ENDPOINT, {
+    const url = coordinates ? `${ENDPOINT}${ENDPOINT.includes("?") ? "&" : "?"}coordinates` : ENDPOINT;
+    response = await fetchImpl(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -296,6 +351,10 @@ export async function pack({ prompt, speed, stability, credentials, fetchImpl = 
           : `HTTP ${response.status} with an empty body.`,
       },
     };
+  }
+
+  if (coordinates && response.status === 402 && /coordinates/i.test(payload?.error ?? "")) {
+    return pack({ prompt, speed, stability, credentials, fetchImpl, timeoutMs, coordinates: false });
   }
 
   if (!response.ok || payload.error) {
