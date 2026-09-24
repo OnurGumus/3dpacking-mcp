@@ -24,7 +24,23 @@ import {
 import { pack, SIGNUP_URL, UPGRADE_URL } from "./api.js";
 import { VIEW_LISTING, VIEW_URI, isViewUri, viewContents } from "./view.js";
 
-export const SERVER_INFO = { name: "3dpacking", version: "0.3.0" };
+/**
+ * The mark, for clients that show a connector's icon. Claude finds the site's favicon on
+ * its own; ChatGPT showed a blank circle, so the server says it outright. Absolute URLs,
+ * because a client resolves them outside any page of ours.
+ */
+const ICONS = [
+  { src: "https://3dpack.ing/assets/icons/mark-512.png", mimeType: "image/png", sizes: ["512x512"] },
+  { src: "https://3dpack.ing/assets/icons/mark.svg", mimeType: "image/svg+xml", sizes: ["any"] },
+];
+
+export const SERVER_INFO = {
+  name: "3dpacking",
+  title: "3DPACK.ING",
+  version: "0.3.0",
+  websiteUrl: "https://3dpack.ing",
+  icons: ICONS,
+};
 
 /**
  * How a caller gets off the demo account, which depends on how they connected.
@@ -41,6 +57,7 @@ export const KEY_SETUP_HOSTED =
 export const PACK_TOOL = {
   name: "pack_shipment",
   title: "Pack a shipment into containers or trucks",
+  icons: ICONS,
   // Hosts that support MCP Apps (Claude) draw the 3D plan under the answer; the rest
   // ignore this and relay the text, which carries the same link.
   _meta: { ui: { resourceUri: VIEW_URI } },
