@@ -16,10 +16,13 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import {
   CallToolRequestSchema,
+  ListResourcesRequestSchema,
   ListToolsRequestSchema,
+  ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
 import { pack, SIGNUP_URL, UPGRADE_URL } from "./api.js";
+import { VIEW_LISTING, VIEW_URI, viewContents } from "./view.js";
 
 export const SERVER_INFO = { name: "3dpacking", version: "0.3.0" };
 
@@ -38,6 +41,9 @@ export const KEY_SETUP_HOSTED =
 export const PACK_TOOL = {
   name: "pack_shipment",
   title: "Pack a shipment into containers or trucks",
+  // Hosts that support MCP Apps (Claude) draw the 3D plan under the answer; the rest
+  // ignore this and relay the text, which carries the same link.
+  _meta: { ui: { resourceUri: VIEW_URI } },
   description:
     "Work out how a shipment fits into shipping containers, trucks or pallets, using a real 3D bin-packing solver. " +
     "Describe the cargo in plain English -- quantities, dimensions, weights, and any constraints such as fragile, " +
@@ -240,10 +246,17 @@ function failureIsFault(kind) {
  * the second caller about a demo notice the first one already saw.
  */
 export function createServer(credentials, keySetup = KEY_SETUP_ENV) {
-  const server = new Server(SERVER_INFO, { capabilities: { tools: {} } });
+  const server = new Server(SERVER_INFO, { capabilities: { tools: {}, resources: {} } });
   const noticeState = { given: false };
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [PACK_TOOL] }));
+
+  server.setRequestHandler(ListResourcesRequestSchema, async () => ({ resources: [VIEW_LISTING] }));
+
+  server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    if (request.params.uri !== VIEW_URI) throw new Error(`Unknown resource: ${request.params.uri}`);
+    return viewContents();
+  });
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     if (request.params.name !== PACK_TOOL.name) {
@@ -261,6 +274,9 @@ export function createServer(credentials, keySetup = KEY_SETUP_ENV) {
       if (result.ok) {
         return {
           content: [{ type: "text", text: renderSuccess(result.data, result, credentials, noticeState, keySetup) }],
+          // For the 3D view, which frames this plan. Not for the model: the text
+          // above already carries the link.
+          ...(result.data.resultUrl ? { structuredContent: { resultUrl: result.data.resultUrl } } : {}),
         };
       }
 

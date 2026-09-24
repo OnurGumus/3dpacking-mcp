@@ -10,6 +10,8 @@
  */
 
 import { credentialsFromConfig, credentialsFromEnv, pack, normaliseResultUrl, classifyFailure } from "./api.js";
+import { PACK_TOOL } from "./server.js";
+import { VIEW_URI, viewContents } from "./view.js";
 
 let failures = 0;
 
@@ -75,6 +77,17 @@ check(
 check(
   "a key with no username still falls back to the demo pair",
   credentialsFromConfig(query(""), { "x-api-key": "k1" }).isDemo,
+);
+
+const view = viewContents().contents[0];
+
+check("pack_shipment names the 3D view for MCP Apps hosts", PACK_TOOL._meta?.ui?.resourceUri === VIEW_URI);
+
+check("the view is served as an MCP App", view.mimeType === "text/html;profile=mcp-app" && view.text.includes("ui/initialize"));
+
+check(
+  "the view may frame 3dpack.ing and nothing else",
+  JSON.stringify(view._meta.ui.csp.frameDomains) === JSON.stringify(["https://3dpack.ing"]),
 );
 
 // --- live ------------------------------------------------------------------

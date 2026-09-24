@@ -1,0 +1,215 @@
+<!doctype html>
+<!--
+  The 3D load plan, inside the chat -- an MCP App view (text/html;profile=mcp-app).
+
+  Claude renders this in a sandboxed iframe under the pack_shipment answer. It frames
+  the real viewer, 3dpack.ing/app?g=<id>&embed=viewer, rather than a copy of it: the
+  site's viewer is years of rendering work, and a second one here would drift from it
+  the first time either changed. The resource declares https://3dpack.ing in
+  csp.frameDomains, which is the only reason the nested frame is allowed at all.
+
+  The protocol is written by hand -- a dozen lines of postMessage -- rather than
+  bundled from @modelcontextprotocol/ext-apps, so this stays one file with nothing to
+  build and nothing to load from a CDN the sandbox would also have to allow.
+
+  "Open full plan" goes through ui/open-link, not a target=_blank link: the sandbox
+  decides whether this frame may open windows, and the host is the one that can.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3D load plan</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --fg: #1d1d1b;
+    --muted: #6d6a64;
+    --line: rgba(29, 29, 27, .14);
+    --ground: #efede8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --fg: #ecebe8;
+      --muted: #a29f98;
+      --line: rgba(236, 235, 232, .16);
+      --ground: #22211f;
+    }
+  }
+  :root[data-theme="dark"] {
+    --fg: #ecebe8;
+    --muted: #a29f98;
+    --line: rgba(236, 235, 232, .16);
+    --ground: #22211f;
+  }
+  /* The attribute has to win over the display rules below, or a hidden element shows. */
+  [hidden] { display: none !important; }
+  html, body {
+    margin: 0;
+    background: transparent;
+    color: var(--fg);
+    font: 13px/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    height: 40px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  .title { font-weight: 600; }
+  .title span { color: var(--muted); font-weight: 400; }
+  button {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 4px 10px;
+    cursor: pointer;
+  }
+  button:hover { border-color: var(--muted); }
+  .stage {
+    position: relative;
+    height: 420px;
+    background: var(--ground);
+  }
+  iframe {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+  .wait {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+  <div class="bar">
+    <div class="title">3D load plan <span>· drag to turn, scroll to zoom</span></div>
+    <button id="open" type="button" hidden>Open full plan ↗</button>
+  </div>
+  <div class="stage">
+    <div class="wait" id="wait">Packing…</div>
+    <iframe id="plan" title="3D load plan" hidden></iframe>
+  </div>
+<script>
+  // Everything the page's size is made of: the bar plus the stage. Reported to the
+  // host so the frame is sized to this rather than to a guess.
+  const HEIGHT = 461;
+  const ORIGIN = "https://3dpack.ing";
+
+  const wait = document.getElementById("wait");
+  const plan = document.getElementById("plan");
+  const open = document.getElementById("open");
+
+  let nextId = 1;
+  const pending = new Map();
+  let fullPlanUrl = null;
+
+  const send = (message) => window.parent.postMessage(message, "*");
+
+  const request = (method, params) =>
+    new Promise((resolve, reject) => {
+      const id = nextId++;
+      pending.set(id, { resolve, reject });
+      send({ jsonrpc: "2.0", id, method, params });
+    });
+
+  const notify = (method, params) => send({ jsonrpc: "2.0", method, params });
+
+  const applyTheme = (context) => {
+    if (context && (context.theme === "light" || context.theme === "dark")) {
+      document.documentElement.dataset.theme = context.theme;
+    }
+  };
+
+  // Only ever a 3dpack.ing plan. The URL arrives from the tool result, and a frame
+  // pointed anywhere else would be this page lending its place in the chat to it.
+  const isPlan = (url) => {
+    try {
+      const parsed = new URL(url);
+      return parsed.origin === ORIGIN && parsed.pathname === "/app" && parsed.searchParams.has("g");
+    } catch {
+      return false;
+    }
+  };
+
+  const show = (result) => {
+    const structured = (result && result.structuredContent) || {};
+    let full = structured.resultUrl;
+
+    // Older servers, or a host that drops structuredContent: the link is in the text.
+    if (!full) {
+      const text = ((result && result.content) || []).map((c) => c.text || "").join("\n");
+      const match = text.match(/https:\/\/3dpack\.ing\/app\?g=[0-9a-f-]+/i);
+      full = match && match[0];
+    }
+
+    if (!full || !isPlan(full)) {
+      wait.textContent = "No 3D plan came back for this answer.";
+      return;
+    }
+
+    const viewer = new URL(full);
+    viewer.searchParams.set("embed", "viewer");
+    fullPlanUrl = full;
+    plan.src = viewer.toString();
+    plan.hidden = false;
+    wait.hidden = true;
+    open.hidden = false;
+  };
+
+  window.addEventListener("message", (event) => {
+    if (event.source !== window.parent) return;
+    const message = event.data;
+    if (!message || message.jsonrpc !== "2.0") return;
+
+    // A response to something this page asked.
+    if (message.id != null && !message.method) {
+      const waiting = pending.get(message.id);
+      if (waiting) {
+        pending.delete(message.id);
+        message.error ? waiting.reject(message.error) : waiting.resolve(message.result);
+      }
+      return;
+    }
+
+    switch (message.method) {
+      case "ui/notifications/tool-result":
+        show(message.params);
+        break;
+      case "ui/notifications/host-context-changed":
+        applyTheme(message.params);
+        break;
+      default:
+        // A request from the host this page has nothing to add to (teardown, say):
+        // answer it, so the host is not left waiting on a frame about to go away.
+        if (message.id != null) send({ jsonrpc: "2.0", id: message.id, result: {} });
+    }
+  });
+
+  open.addEventListener("click", () => {
+    if (!fullPlanUrl) return;
+    request("ui/open-link", { url: fullPlanUrl }).catch(() => window.open(fullPlanUrl, "_blank", "noopener"));
+  });
+
+  request("ui/initialize", {
+    protocolVersion: "2026-01-26",
+    appInfo: { name: "3dpacking-load-plan", version: "1.0.0" },
+    appCapabilities: { availableDisplayModes: ["inline"] },
+  }).then((result) => {
+    applyTheme(result && result.hostContext);
+    notify("ui/notifications/initialized", {});
+    notify("ui/notifications/size-changed", { width: document.documentElement.scrollWidth, height: HEIGHT });
+  });
+</script>
+</body>
+</html>

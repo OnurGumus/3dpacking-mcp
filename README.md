@@ -84,6 +84,14 @@ account on the free plan. For your own limits, sign up at
 
 Both must be set together — the API rejects a key without a username.
 
+### The 3D plan inside Claude
+
+In hosts that support [MCP Apps](https://modelcontextprotocol.io/extensions/apps/overview)
+— Claude on the web and desktop — the answer comes with the load plan drawn under it,
+in 3D, turnable in place. It is the site's own viewer (`/app?g=<id>&embed=viewer`)
+framed by a small view the server provides (`ui://3dpacking/load-plan.html`). Other
+hosts get the same answer as text with the link.
+
 ## The tool
 
 **`pack_shipment`** — one required argument, `prompt`, describing the cargo in plain
