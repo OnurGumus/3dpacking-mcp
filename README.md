@@ -89,7 +89,7 @@ Both must be set together — the API rejects a key without a username.
 In hosts that support [MCP Apps](https://modelcontextprotocol.io/extensions/apps/overview)
 — Claude on the web and desktop — the answer comes with the load drawn under it in 3D:
 drag to turn, scroll to zoom, one colour per kind of piece, a pager for loads that take
-several containers. The view is `ui://3dpacking/load-plan.html`, drawing the placements
+several containers. The view is `ui://3dpacking/load-plan-<hash>.html` (named after its contents, so a changed view is never served from a host cache), drawing the placements
 the tool result carries in `_meta` (so they reach the view, not the model). It needs
 your own key: the shared demo account gets the answer and the link, not the
 placements. Other hosts get the same answer as text with the link.

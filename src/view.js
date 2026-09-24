@@ -14,12 +14,20 @@
  * the real viewer is the upgrade.
  */
 
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
-export const VIEW_URI = "ui://3dpacking/load-plan.html";
 export const VIEW_MIME = "text/html;profile=mcp-app";
 
 const html = readFileSync(new URL("./load-plan.html", import.meta.url), "utf8");
+
+/**
+ * Named after its own contents. Claude caches a view by its URI: after the view
+ * changed, a connector that had seen the old one kept rendering it -- still framing
+ * the site, still refused -- against a server already serving the new one. A hash in
+ * the name makes every change a new resource, so no cache can hold a stale one.
+ */
+export const VIEW_URI = `ui://3dpacking/load-plan-${createHash("sha256").update(html).digest("hex").slice(0, 12)}.html`;
 
 export const VIEW_LISTING = {
   uri: VIEW_URI,
