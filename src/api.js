@@ -65,10 +65,20 @@ export function credentialsFromEnv(env = process.env) {
  * are on the list. The username has no approved header to ride in, and it is not a
  * secret, so a connector puts it in the URL (`?username=…`) and the key in a header.
  *
+ * A signed-in account arrives as `Authorization: Bearer 3dp.<username>.<key>` -- the
+ * access token 3dpack.ing's OAuth endpoint issues, which is an ordinary API key
+ * created for that account at sign-in, with its username in front. So the key checks,
+ * the credit accounting and revocation are the ones every other key already has.
+ *
  * Same fallback rule as the environment: half a credential becomes the demo pair
- * rather than an obscure 400, because a first call that works is the whole point.
+ * rather than an obscure 400. No credential at all is different: it is marked
+ * `anonymous`, and the HTTP transport answers it with a 401 that sends the client to
+ * sign in -- which is how Claude and ChatGPT know to show a login.
  */
 export function credentialsFromConfig(searchParams, headers = {}) {
+  const account = accountToken(bearerToken(headers.authorization));
+  if (account) return { ...account, isDemo: false };
+
   let fromConfigParam = {};
   const encoded = searchParams?.get?.("config");
 
@@ -98,7 +108,18 @@ export function credentialsFromConfig(searchParams, headers = {}) {
 
   if (apiKey && username) return { apiKey, username, isDemo: false };
 
-  return { ...DEMO_CREDENTIALS, isDemo: true };
+  return { ...DEMO_CREDENTIALS, isDemo: true, anonymous: !apiKey && !username };
+}
+
+/**
+ * An access token from 3dpack.ing's OAuth endpoint: `3dp.<base64url username>.<key>`.
+ * Null for anything else, including a plain API key sent as a bearer token.
+ */
+export function accountToken(token) {
+  const match = /^3dp\.([A-Za-z0-9_-]+)\.(\S+)$/.exec(token ?? "");
+  if (!match) return null;
+  const username = Buffer.from(match[1], "base64url").toString("utf8").trim();
+  return username ? { apiKey: match[2], username } : null;
 }
 
 /**

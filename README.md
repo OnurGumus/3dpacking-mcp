@@ -13,34 +13,38 @@ overstates what fits by a wide margin on real cargo.
 
 ### Hosted (no install)
 
-The server runs at `https://3dpack.ing/mcp` over streamable HTTP. Nothing to install,
-and it answers on the first call without an account.
+The server runs at `https://3dpack.ing/mcp` over streamable HTTP. Add the address to
+your assistant and sign in with your 3DPACK.ING account when it asks — OAuth, the way
+Claude, ChatGPT and Claude Code connect to any service. A free account works, on its
+free monthly packs.
+
+Claude (web, desktop): Settings → Connectors → Add custom connector → paste
+`https://3dpack.ing/mcp` and choose sign-in.
+
+ChatGPT (developer mode): add the same address with OAuth.
 
 Claude Code:
 
 ```bash
 claude mcp add --transport http 3dpacking https://3dpack.ing/mcp
+# then /mcp → Authenticate
 ```
 
-Any client that takes a URL — add `https://3dpack.ing/mcp`. To use your own key
-instead of the shared demo account, pass it in the query string:
+**With an API key instead of signing in.** Pass the key and the account it belongs to
+in the query string:
 
 ```
 https://3dpack.ing/mcp?apiKey=your-key&username=your-username
 ```
 
-or send `X-3dpacking-Api-Key` and `X-3dpacking-Username` headers, if you would rather
-not put a key in a URL. Both are needed together — the API rejects a key without the
-account it belongs to.
+or keep the key out of the URL: `X-API-Key: your-key` (or `Authorization: Bearer
+your-key`, or `X-3dpacking-Api-Key`) with `?username=your-username` in the URL. Claude's
+connector dialog only sends approved header names, so there use `x-api-key`. The shared
+demo account is `?apiKey=test&username=test`.
 
-Claude (claude.ai custom connectors) only sends approved header names, so there the
-key goes in `X-API-Key` (or `Authorization: Bearer your-key`) and the username stays
-in the URL:
-
-```
-URL:     https://3dpack.ing/mcp?username=your-username
-Header:  X-API-Key: your-key
-```
+A request with no credentials at all is answered `401` with a pointer to the sign-in
+metadata (`/.well-known/oauth-protected-resource/mcp`), which is what makes a client
+show the login.
 
 ### Local (npm)
 

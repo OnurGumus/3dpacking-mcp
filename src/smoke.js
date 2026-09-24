@@ -75,6 +75,16 @@ check(
 );
 
 check(
+  "an OAuth access token carries its own account",
+  (() => {
+    const c = credentialsFromConfig(query(""), { authorization: "Bearer 3dp." + Buffer.from("rj@example.com").toString("base64url") + ".k9" });
+    return c.username === "rj@example.com" && c.apiKey === "k9" && !c.isDemo && !c.anonymous;
+  })(),
+);
+
+check("no credential at all is anonymous, so the transport can ask for sign-in", credentialsFromConfig(query(""), {}).anonymous === true);
+
+check(
   "a key with no username still falls back to the demo pair",
   credentialsFromConfig(query(""), { "x-api-key": "k1" }).isDemo,
 );

@@ -36,6 +36,10 @@ const SESSION_TTL_MS = 30 * 60 * 1000;
 const SWEEP_EVERY_MS = 5 * 60 * 1000;
 const MAX_BODY_BYTES = 1 * 1024 * 1024;
 
+/** Where a client learns how to sign in (RFC 9728), named in every 401. */
+const RESOURCE_METADATA =
+  process.env.MCP_RESOURCE_METADATA_URL?.trim() || "https://3dpack.ing/.well-known/oauth-protected-resource/mcp";
+
 /** sessionId -> { transport, lastSeen } */
 const sessions = new Map();
 
@@ -89,7 +93,7 @@ function cors(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept, Mcp-Session-Id, Mcp-Protocol-Version, Authorization, X-API-Key, X-3dpacking-Api-Key, X-3dpacking-Username");
-  res.setHeader("Access-Control-Expose-Headers", "Mcp-Session-Id");
+  res.setHeader("Access-Control-Expose-Headers", "Mcp-Session-Id, WWW-Authenticate");
   res.setHeader("Access-Control-Max-Age", "86400");
 }
 
@@ -143,6 +147,29 @@ const http = createHttpServer(async (req, res) => {
         // Every later call on this session uses them, which is what makes the session
         // worth having: a hosted endpoint otherwise has no idea who is calling.
         const credentials = credentialsFromConfig(url.searchParams, req.headers);
+
+        // Nothing to say who is calling: ask the client to sign in. The 401 with
+        // `resource_metadata` is the MCP authorization spec's cue -- Claude and
+        // ChatGPT follow it to 3dpack.ing's login and come back with a token. An
+        // explicit key, the published demo pair included, still connects directly.
+        if (credentials.anonymous) {
+          res.writeHead(401, {
+            "Content-Type": "application/json",
+            "WWW-Authenticate": `Bearer resource_metadata="${RESOURCE_METADATA}"`,
+          });
+          res.end(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              error: {
+                code: -32001,
+                message:
+                  "Sign in with your 3DPACK.ING account to use this server, or pass an API key -- see https://3dpack.ing/api-docs.html#mcp",
+              },
+              id: body?.id ?? null,
+            }),
+          );
+          return;
+        }
 
         const transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: () => randomUUID(),

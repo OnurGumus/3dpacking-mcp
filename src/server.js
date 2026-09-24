@@ -35,8 +35,8 @@ export const SERVER_INFO = { name: "3dpacking", version: "0.3.0" };
  */
 export const KEY_SETUP_ENV = "set THREEDPACKING_API_KEY and THREEDPACKING_USERNAME";
 export const KEY_SETUP_HOSTED =
-  "connect to https://3dpack.ing/mcp?username=<your account email> with your key in an X-API-Key " +
-  "header, or put both in the URL as ?apiKey=<key>&username=<email>";
+  "connect to https://3dpack.ing/mcp with no key and sign in with your account when asked -- or send an " +
+  "API key as an X-API-Key header with ?username=<your account email> in the URL";
 
 export const PACK_TOOL = {
   name: "pack_shipment",
