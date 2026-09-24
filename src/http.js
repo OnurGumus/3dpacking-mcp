@@ -158,23 +158,29 @@ const http = createHttpServer(async (req, res) => {
         return;
       }
 
-      jsonRpcError(
-        res,
-        400,
-        -32000,
-        sessionId
-          ? "Unknown or expired session. Send an initialize request to start a new one."
-          : "Missing Mcp-Session-Id. Send an initialize request first.",
-        body?.id ?? null,
-      );
+      // 404 for a session this process does not hold, 400 only for none at all. The
+      // streamable-HTTP spec makes 404 the signal to re-initialize, and clients act on
+      // it; a 400 they do not, so Claude kept resending a dead id and the connector
+      // stayed broken until it was removed and re-added. Sessions die here routinely --
+      // every deploy restarts the process, and the sweep drops them after 30 idle
+      // minutes -- so this is the normal path, not an edge case.
+      if (sessionId) {
+        jsonRpcError(res, 404, -32001, "Unknown or expired session. Send an initialize request to start a new one.", body?.id ?? null);
+      } else {
+        jsonRpcError(res, 400, -32000, "Missing Mcp-Session-Id. Send an initialize request first.", body?.id ?? null);
+      }
       return;
     }
 
     // GET opens the server-to-client stream; DELETE ends the session. Both need a
     // session that exists -- there is nothing to stream or tear down otherwise.
     if (req.method === "GET" || req.method === "DELETE") {
-      if (!sessionId || !sessions.has(sessionId)) {
-        jsonRpcError(res, 400, -32000, "Missing or unknown Mcp-Session-Id.");
+      if (!sessionId) {
+        jsonRpcError(res, 400, -32000, "Missing Mcp-Session-Id.");
+        return;
+      }
+      if (!sessions.has(sessionId)) {
+        jsonRpcError(res, 404, -32001, "Unknown or expired session. Send an initialize request to start a new one.");
         return;
       }
       touch(sessionId);
