@@ -25,7 +25,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 
 import { credentialsFromConfig } from "./api.js";
-import { createServer, SERVER_INFO } from "./server.js";
+import { createServer, KEY_SETUP_HOSTED, SERVER_INFO } from "./server.js";
 
 const PORT = Number(process.env.PORT || 8080);
 const PATH = process.env.MCP_PATH || "/mcp";
@@ -153,7 +153,7 @@ const http = createHttpServer(async (req, res) => {
           if (transport.sessionId) sessions.delete(transport.sessionId);
         };
 
-        await createServer(credentials).connect(transport);
+        await createServer(credentials, KEY_SETUP_HOSTED).connect(transport);
         await transport.handleRequest(req, res, body);
         return;
       }

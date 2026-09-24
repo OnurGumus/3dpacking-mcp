@@ -23,6 +23,18 @@ import { pack, SIGNUP_URL, UPGRADE_URL } from "./api.js";
 
 export const SERVER_INFO = { name: "3dpacking", version: "0.3.0" };
 
+/**
+ * How a caller gets off the demo account, which depends on how they connected.
+ *
+ * The stdio install reads environment variables; a hosted caller has none to set. A
+ * claude.ai connector told to "set THREEDPACKING_API_KEY" has nowhere to put it, so
+ * each entry point hands `createServer` the instruction its own callers can follow.
+ */
+export const KEY_SETUP_ENV = "set THREEDPACKING_API_KEY and THREEDPACKING_USERNAME";
+export const KEY_SETUP_HOSTED =
+  "connect to https://3dpack.ing/mcp?username=<your account email> with your key in an X-API-Key " +
+  "header, or put both in the URL as ?apiKey=<key>&username=<email>";
+
 export const PACK_TOOL = {
   name: "pack_shipment",
   title: "Pack a shipment into containers or trucks",
@@ -72,7 +84,7 @@ export const PACK_TOOL = {
 };
 
 /** Renders a result the way a person would want it read back to them. */
-function renderSuccess(data, { truncated }, credentials, noticeState) {
+function renderSuccess(data, { truncated }, credentials, noticeState, keySetup) {
   const lines = [];
 
   if (data.containersUsed === 0) {
@@ -132,7 +144,7 @@ function renderSuccess(data, { truncated }, credentials, noticeState) {
       "This ran on the shared demo account, which everybody trying this server shares. It packs up to " +
         "500 boxes at a time, and what else it will do depends on the allowance left on it that day, so " +
         `treat it as a trial rather than as a plan. For limits of your own, sign up at ${SIGNUP_URL} ` +
-        "and set THREEDPACKING_API_KEY and THREEDPACKING_USERNAME.",
+        `and ${keySetup}.`,
     );
   }
 
@@ -140,7 +152,7 @@ function renderSuccess(data, { truncated }, credentials, noticeState) {
 }
 
 /** Renders a failure as something to do next rather than a stack trace. */
-function renderFailure(failure, credentials) {
+function renderFailure(failure, credentials, keySetup) {
   switch (failure.kind) {
     case "plan_limit":
       // Not an error. The user asked for something real that their plan does not
@@ -178,7 +190,7 @@ function renderFailure(failure, credentials) {
       return [
         "No API key reached the service.",
         "",
-        `Set THREEDPACKING_API_KEY and THREEDPACKING_USERNAME, or omit both to use the demo account. Sign up at ${SIGNUP_URL}`,
+        `To use your own account, ${keySetup}. Send neither to use the demo account. Sign up at ${SIGNUP_URL}`,
       ].join("\n");
 
     case "bad_request": {
@@ -227,7 +239,7 @@ function failureIsFault(kind) {
  * instance for that reason -- a hosted endpoint sharing it across callers would tell
  * the second caller about a demo notice the first one already saw.
  */
-export function createServer(credentials) {
+export function createServer(credentials, keySetup = KEY_SETUP_ENV) {
   const server = new Server(SERVER_INFO, { capabilities: { tools: {} } });
   const noticeState = { given: false };
 
@@ -248,7 +260,7 @@ export function createServer(credentials) {
 
       if (result.ok) {
         return {
-          content: [{ type: "text", text: renderSuccess(result.data, result, credentials, noticeState) }],
+          content: [{ type: "text", text: renderSuccess(result.data, result, credentials, noticeState, keySetup) }],
         };
       }
 
@@ -256,7 +268,7 @@ export function createServer(credentials) {
       // actionable answer, and flagging it as an error is what makes an assistant
       // apologise for the service instead of relaying the offer.
       const isError = failureIsFault(result.failure.kind);
-      return { isError, content: [{ type: "text", text: renderFailure(result.failure, credentials) }] };
+      return { isError, content: [{ type: "text", text: renderFailure(result.failure, credentials, keySetup) }] };
     } catch (error) {
       return {
         isError: true,
