@@ -441,8 +441,15 @@
 
   // --- the tool result -----------------------------------------------------------
 
+  // ChatGPT strips custom `_meta` from the result it hands the view (reported March
+  // 2026, acknowledged by OpenAI) but exposes the same object as
+  // window.openai.toolResponseMetadata, which it may fill in after the result arrives.
+  const chatgptMeta = () => (window.openai && window.openai.toolResponseMetadata) || {};
+  let lastResult = null;
+
   async function show(result) {
-    const meta = (result && result._meta) || {};
+    lastResult = result;
+    const meta = { ...chatgptMeta(), ...((result && result._meta) || {}) };
     fullPlanUrl = meta["ing.3dpack/resultUrl"] || null;
 
     // A host that drops `_meta`: the link is still in the text.
@@ -455,9 +462,12 @@
 
     plan = meta["ing.3dpack/plan"] || null;
     if (!plan || !plan.containers || !plan.containers.length) {
+      // Not "needs your own key": a host that drops the metadata lands here too, and
+      // telling a paying user to buy a key would be wrong. The demo account's offer is
+      // in the text answer already.
       say(
         fullPlanUrl
-          ? "The 3D view here comes with your own API key. Open the full plan to see this load."
+          ? "The 3D view isn't available here. Open the full plan to see this load."
           : "No 3D plan came back for this answer.",
       );
       return;
@@ -511,6 +521,11 @@
         // answer it, so the host is not left waiting on a frame about to go away.
         if (message.id != null) send({ jsonrpc: "2.0", id: message.id, result: {} });
     }
+  });
+
+  // ChatGPT sets its globals when they change, which can be after the result came in.
+  window.addEventListener("openai:set_globals", () => {
+    if (!plan && chatgptMeta()["ing.3dpack/plan"]) show(lastResult || { content: [] });
   });
 
   open.addEventListener("click", () => {

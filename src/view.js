@@ -55,6 +55,10 @@ export const viewContents = (uri = VIEW_URI) => ({
           csp: { resourceDomains: ["https://cdn.jsdelivr.net"] },
           prefersBorder: true,
         },
+        // The same two settings under ChatGPT's own names, which its Apps SDK reads.
+        // Claude ignores them.
+        "openai/widgetCSP": { connect_domains: [], resource_domains: ["https://cdn.jsdelivr.net"] },
+        "openai/widgetPrefersBorder": true,
       },
     },
   ],
