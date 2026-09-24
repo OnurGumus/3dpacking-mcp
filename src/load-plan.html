@@ -110,6 +110,10 @@
     font-size: 12px;
     color: var(--muted);
     pointer-events: none;
+    /* Over the load once it is zoomed in, so it needs its own ground to stay legible. */
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--bar) 85%, transparent);
   }
   .legend i {
     display: inline-block;
@@ -267,8 +271,67 @@
   const dispose = (object) =>
     object.traverse((o) => {
       if (o.geometry) o.geometry.dispose();
-      if (o.material) o.material.dispose();
+      for (const m of [].concat(o.material || [])) {
+        if (m.map) m.map.dispose();
+        m.dispose();
+      }
     });
+
+  // --- labels --------------------------------------------------------------------
+
+  const trim = (n) => String(Math.round(n * 10) / 10);
+
+  // "Boxes 60x40x50" -> "Boxes": the face shows the size as placed, and the size the
+  // parser wrote into the name is the size as described, which a turned box contradicts.
+  const labelName = (name) =>
+    name.replace(/\s*\d+(?:\.\d+)?\s*[x×]\s*\d+(?:\.\d+)?(?:\s*[x×]\s*\d+(?:\.\d+)?)?\s*(?:mm|cm|m|in|ft)?\s*$/i, "") || name;
+
+  /**
+   * One face's label, painted on a canvas the shape of the face -- so the text keeps its
+   * proportions however long or flat the face is. Null when even one line will not fit
+   * at a readable size; that face is left plain.
+   */
+  function faceTexture(background, lines, faceWidth, faceHeight) {
+    const long = 256;
+    const scale = long / Math.max(faceWidth, faceHeight);
+    const cw = Math.max(8, Math.round(faceWidth * scale));
+    const ch = Math.max(8, Math.round(faceHeight * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = cw;
+    canvas.height = ch;
+    const ctx = canvas.getContext("2d");
+
+    const fits = (text, px) => {
+      ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
+      return text.every((t) => ctx.measureText(t).width <= cw * 0.86) && text.length * px * 1.3 <= ch * 0.86;
+    };
+    let shown = lines;
+    let px = Math.min(ch * 0.24, 34);
+    while (px >= 9 && !fits(shown, px)) px -= 1;
+    if (px < 9 && lines.length > 1) {
+      shown = [lines[1]];
+      px = Math.min(ch * 0.32, 34);
+      while (px >= 9 && !fits(shown, px)) px -= 1;
+    }
+    if (px < 9) return null;
+
+    ctx.fillStyle = background;
+    ctx.fillRect(0, 0, cw, ch);
+    ctx.fillStyle = "rgba(29, 29, 27, .78)";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const step = px * 1.3;
+    shown.forEach((text, i) => {
+      ctx.font = `${i === 0 && shown.length > 1 ? 600 : 500} ${px}px ui-sans-serif, system-ui, sans-serif`;
+      ctx.fillText(text, cw / 2, ch / 2 + (i - (shown.length - 1) / 2) * step);
+    });
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = 4;
+    return texture;
+  }
 
   function draw() {
     const { scene } = gl;
@@ -297,17 +360,38 @@
     shell.position.set(W / 2, H / 2, L / 2);
     root.add(shell);
 
-    // One geometry and one material per kind, shared by every box of that kind.
+    // One geometry for every box. Materials are per kind of piece *and* per way it was
+    // turned, because the label is the size as placed: boxes that share both share
+    // six faces' worth of labels, so a 500-box load still paints only a handful.
     const unit = new THREE.BoxGeometry(1, 1, 1);
     const unitEdges = new THREE.EdgesGeometry(unit);
-    const materials = plan.groups.map((_, g) => new THREE.MeshLambertMaterial({ color: PALETTE[g % PALETTE.length] }));
+    const plain = plan.groups.map((_, g) => new THREE.MeshLambertMaterial({ color: PALETTE[g % PALETTE.length] }));
+    // Faces thinner than this, relative to the container, would carry text nobody can read.
+    const smallest = Math.max(W, H, L) * 0.03;
+    const faces = new Map();
+    const materialsFor = (g, w, h, l) => {
+      const key = `${g}|${w}|${h}|${l}`;
+      if (!faces.has(key)) {
+        const lines = [labelName(plan.groups[g].name), `${trim(l)} × ${trim(w)} × ${trim(h)}`];
+        const face = (fw, fh) => {
+          if (Math.min(fw, fh) < smallest) return plain[g];
+          const texture = faceTexture(PALETTE[g % PALETTE.length], lines, fw, fh);
+          return texture ? new THREE.MeshLambertMaterial({ map: texture }) : plain[g];
+        };
+        // BoxGeometry's face order: +x, -x, +y, -y, +z, -z. A face across x spans the
+        // length and height; the top spans width and length; the ends, width and height.
+        const sides = face(l, h), top = face(w, l), ends = face(w, h);
+        faces.set(key, [sides, sides, top, top, ends, ends]);
+      }
+      return faces.get(key);
+    };
     const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: dark ? 0.45 : 0.28 });
     // Past this many, an outline per box costs more than it shows.
     const outlines = container.items.length <= 2000;
 
     const counts = new Map();
     for (const [x, y, z, w, h, l, g] of container.items) {
-      const box = new THREE.Mesh(unit, materials[g]);
+      const box = new THREE.Mesh(unit, materialsFor(g, w, h, l));
       box.scale.set(w, h, l);
       box.position.set(x + w / 2, y + h / 2, z + l / 2);
       root.add(box);
