@@ -94,6 +94,11 @@ const view = viewContents().contents[0];
 check("pack_shipment names the 3D view for MCP Apps hosts", PACK_TOOL._meta?.ui?.resourceUri === VIEW_URI);
 
 check(
+  "pack_shipment sets every hint the app directories require",
+  ["readOnlyHint", "destructiveHint", "openWorldHint"].every((h) => typeof PACK_TOOL.annotations?.[h] === "boolean"),
+);
+
+check(
   "an older view URI still gets today's view, anything else does not",
   isViewUri("ui://3dpacking/load-plan-09e0cc1c6f50.html") && isViewUri("ui://3dpacking/load-plan.html") && !isViewUri("ui://other/x.html"),
 );

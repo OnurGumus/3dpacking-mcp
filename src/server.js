@@ -44,6 +44,17 @@ export const PACK_TOOL = {
   // Hosts that support MCP Apps (Claude) draw the 3D plan under the answer; the rest
   // ignore this and relay the text, which carries the same link.
   _meta: { ui: { resourceUri: VIEW_URI } },
+  // Explicit, because both app directories reject a tool that leaves them to defaults.
+  // Not read-only: a pack saves the load plan to the user's account and uses a pack from
+  // their allowance. Not destructive and not open-world: it only ever adds to that
+  // private account, and publishes or sends nothing.
+  annotations: {
+    title: "Pack a shipment into containers or trucks",
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: false,
+  },
   description:
     "Work out how a shipment fits into shipping containers, trucks or pallets, using a real 3D bin-packing solver. " +
     "Describe the cargo in plain English -- quantities, dimensions, weights, and any constraints such as fragile, " +
@@ -171,7 +182,9 @@ function renderFailure(failure, credentials, keySetup) {
             "server. A key of your own gets your plan's limits instead."
           : "The account this key belongs to is on the free plan.",
         "",
-        `Plans and upgrade: ${UPGRADE_URL}`,
+        // Information, not a checkout: the ChatGPT directory allows a link to a page that
+        // describes the plans and refuses one that starts a purchase.
+        `See the plans: ${UPGRADE_URL}`,
         // Only when the refusal was actually about several containers. It used to be
         // offered for every plan limit, which sent a caller who had been refused for
         // sending too many boxes off to rewrite a container choice that was never the
@@ -189,7 +202,7 @@ function renderFailure(failure, credentials, keySetup) {
       return [
         `The API rejected the credentials or the account is out of credit: ${failure.detail}`,
         "",
-        `Check the key and username, or top up at ${UPGRADE_URL}`,
+        `Check the key and username, or see the plans: ${UPGRADE_URL}`,
       ].join("\n");
 
     case "no_credentials":

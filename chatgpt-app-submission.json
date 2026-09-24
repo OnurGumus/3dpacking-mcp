@@ -1,0 +1,92 @@
+{
+  "$schema": "https://developers.openai.com/plugins/schemas/chatgpt-app-submission.v1.json",
+  "schema_version": 1,
+  "app_info": {
+    "display_name": "3DPACK.ING",
+    "subtitle": "3D container & truck loading",
+    "description": "3DPACK.ING works out how cargo fits into shipping containers, trucks and pallets, using a real 3D bin-packing solver.\n\nDescribe a shipment in plain words (quantities, box or pallet sizes, weights, and rules like fragile, do-not-stack or keep upright) and ChatGPT tells you which containers you need, how full each one is, and anything that didn't fit. The load plan is drawn in 3D right in the conversation: turn it, see where every box sits, each labelled with its size, and open the full plan on 3dpack.ing to adjust or export it.\n\nBuilt for freight forwarders, warehouse and logistics teams, and anyone quoting or planning a shipment who needs a real answer rather than a volume estimate.\n\nSign in with a 3DPACK.ING account to use it. A free account includes a monthly allowance of packs.",
+    "category": "PRODUCTIVITY"
+  },
+  "tools": {
+    "pack_shipment": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Each call saves the resulting load plan to the signed-in user's 3DPACK.ING account and uses one pack from their plan or allowance, so it creates private data rather than only reading.",
+        "open_world_justification": "Writes only to the user's own private 3DPACK.ING account and never posts, publishes or sends anything to public or third-party systems.",
+        "destructive_justification": "Only adds a new saved load plan; it never deletes, overwrites or revokes access to anything."
+      }
+    }
+  },
+  "test_cases": [
+    {
+      "description": "Standard pallet capacity question for a common container.",
+      "user_prompt": "How many euro pallets, 120 x 80 cm and 100 cm tall, fit in a 20 ft container?",
+      "file_attachment_urls": null,
+      "tools_triggered": "pack_shipment",
+      "expected_output": "Reports that 22 pallets fit in one 20 ft container (11 on the floor, stacked two high) with the volume used, shows the load in an interactive 3D view with each pallet labelled, and links to the full plan.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Mixed cargo where not everything fits, so the answer must report leftovers.",
+      "user_prompt": "Pack 40 boxes of 120 x 80 x 100 cm and 60 boxes of 60 x 40 x 50 cm into one 20 ft container.",
+      "file_attachment_urls": null,
+      "tools_triggered": "pack_shipment",
+      "expected_output": "Reports how many of each box fit in the container and lists the boxes that did not fit; the 3D view shows the two kinds in different colours with a legend.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Choosing a container mix for a shipment that needs more than one container.",
+      "user_prompt": "I need to ship 50 crates of 120 x 100 x 100 cm. What's the best mix of 20 ft and 40 ft containers?",
+      "file_attachment_urls": null,
+      "tools_triggered": "pack_shipment",
+      "expected_output": "Returns the number and type of containers needed and how full each one is; the 3D view has a pager to step through the containers.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Handling constraints: fragile cargo with a stacking limit in a named container type.",
+      "user_prompt": "Load 100 fragile boxes, 80 x 60 x 40 cm, maximum 3 high, into a 40 ft high cube container.",
+      "file_attachment_urls": null,
+      "tools_triggered": "pack_shipment",
+      "expected_output": "Returns a plan that respects the stacking limit, with the number of boxes loaded, the volume used, and a 3D view of the load.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Cargo that must be fully supported, using the stability setting.",
+      "user_prompt": "Pack 30 boxes of 100 x 100 x 100 cm into a 20 ft container. Nothing may overhang; every stacked box must sit fully on the one below.",
+      "file_attachment_urls": null,
+      "tools_triggered": "pack_shipment",
+      "expected_output": "Calls the tool with full support required and reports how many boxes fit under that rule, with the 3D view and a link to the full plan.",
+      "expected_output_url": null
+    }
+  ],
+  "negative_test_cases": [
+    {
+      "description": "Freight rates are a nearby logistics topic the app does not cover.",
+      "user_prompt": "How much does it cost to ship a 40 ft container from Shanghai to Hamburg?",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "The app should not be invoked; the tool plans loads and does not quote freight prices.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Container tracking is out of scope.",
+      "user_prompt": "Where is container MSCU1234567 right now?",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "The app should not be invoked; it has no shipment tracking.",
+      "expected_output_url": null
+    },
+    {
+      "description": "A programming request about bin packing, not a shipment to plan.",
+      "user_prompt": "Write a Python function that solves the 3D bin packing problem.",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "The app should not be invoked; the user wants code, not a load plan for real cargo.",
+      "expected_output_url": null
+    }
+  ]
+}
