@@ -11,7 +11,7 @@
 
 import { credentialsFromConfig, credentialsFromEnv, pack, normaliseResultUrl, classifyFailure, planForView } from "./api.js";
 import { PACK_TOOL } from "./server.js";
-import { VIEW_URI, viewContents } from "./view.js";
+import { VIEW_URI, isViewUri, viewContents } from "./view.js";
 
 let failures = 0;
 
@@ -82,6 +82,11 @@ check(
 const view = viewContents().contents[0];
 
 check("pack_shipment names the 3D view for MCP Apps hosts", PACK_TOOL._meta?.ui?.resourceUri === VIEW_URI);
+
+check(
+  "an older view URI still gets today's view, anything else does not",
+  isViewUri("ui://3dpacking/load-plan-09e0cc1c6f50.html") && isViewUri("ui://3dpacking/load-plan.html") && !isViewUri("ui://other/x.html"),
+);
 
 check("the view is served as an MCP App", view.mimeType === "text/html;profile=mcp-app" && view.text.includes("ui/initialize"));
 

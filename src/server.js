@@ -22,7 +22,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 
 import { pack, SIGNUP_URL, UPGRADE_URL } from "./api.js";
-import { VIEW_LISTING, VIEW_URI, viewContents } from "./view.js";
+import { VIEW_LISTING, VIEW_URI, isViewUri, viewContents } from "./view.js";
 
 export const SERVER_INFO = { name: "3dpacking", version: "0.3.0" };
 
@@ -254,8 +254,8 @@ export function createServer(credentials, keySetup = KEY_SETUP_ENV) {
   server.setRequestHandler(ListResourcesRequestSchema, async () => ({ resources: [VIEW_LISTING] }));
 
   server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-    if (request.params.uri !== VIEW_URI) throw new Error(`Unknown resource: ${request.params.uri}`);
-    return viewContents();
+    if (!isViewUri(request.params.uri)) throw new Error(`Unknown resource: ${request.params.uri}`);
+    return viewContents(request.params.uri);
   });
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {

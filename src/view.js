@@ -36,10 +36,18 @@ export const VIEW_LISTING = {
   mimeType: VIEW_MIME,
 };
 
-export const viewContents = () => ({
+/**
+ * Whether a URI names any version of this view. Claude keeps a connector's tool list
+ * until the connector is re-added, so after a deploy it can still ask for the URI an
+ * older build advertised. Answering that with today's view gives a stale tool list the
+ * current panel; answering "unknown resource" would give it a broken one.
+ */
+export const isViewUri = (uri) => /^ui:\/\/3dpacking\/load-plan(?:-[0-9a-f]+)?\.html$/.test(uri);
+
+export const viewContents = (uri = VIEW_URI) => ({
   contents: [
     {
-      uri: VIEW_URI,
+      uri,
       mimeType: VIEW_MIME,
       text: html,
       _meta: {
