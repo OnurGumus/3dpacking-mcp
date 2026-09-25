@@ -40,7 +40,7 @@
     },
     {
       "description": "Choosing a container mix for a shipment that needs more than one container.",
-      "user_prompt": "Using 3DPACK.ING, i need to ship 50 crates of 120 x 100 x 100 cm. What's the best mix of 20 ft and 40 ft containers?",
+      "user_prompt": "Using 3DPACK.ING, I need to ship 50 crates of 120 x 100 x 100 cm. What's the best mix of 20 ft and 40 ft containers?",
       "file_attachment_urls": null,
       "tools_triggered": "pack_shipment",
       "expected_output": "Returns the number and type of containers needed and how full each one is; the 3D view has a pager to step through the containers.",
