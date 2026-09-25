@@ -279,7 +279,7 @@ function failureIsFault(kind) {
  * instance for that reason -- a hosted endpoint sharing it across callers would tell
  * the second caller about a demo notice the first one already saw.
  */
-export function createServer(credentials, keySetup = KEY_SETUP_ENV) {
+export function createServer(credentials, keySetup = KEY_SETUP_ENV, via = "mcp-local") {
   const server = new Server(SERVER_INFO, { capabilities: { tools: {}, resources: {} } });
   const noticeState = { given: false };
 
@@ -303,7 +303,7 @@ export function createServer(credentials, keySetup = KEY_SETUP_ENV) {
     const { prompt, speed, stability } = request.params.arguments ?? {};
 
     try {
-      const result = await pack({ prompt, speed, stability, credentials });
+      const result = await pack({ prompt, speed, stability, credentials, client: server.getClientVersion(), via });
 
       if (result.ok) {
         return {

@@ -41,11 +41,11 @@ export function credentialsFromEnv(env = process.env) {
   const apiKey = env.THREEDPACKING_API_KEY?.trim();
   const username = env.THREEDPACKING_USERNAME?.trim();
 
-  if (apiKey && username) return { apiKey, username, isDemo: false };
+  if (apiKey && username) return { apiKey, username, isDemo: false, auth: "key" };
 
   // A key without a username is a 400 from the API. Better to fall back to the
   // demo pair, which works, than to send half a credential and fail obscurely.
-  return { ...DEMO_CREDENTIALS, isDemo: true };
+  return { ...DEMO_CREDENTIALS, isDemo: true, auth: "demo" };
 }
 
 /**
@@ -77,7 +77,7 @@ export function credentialsFromEnv(env = process.env) {
  */
 export function credentialsFromConfig(searchParams, headers = {}) {
   const account = accountToken(bearerToken(headers.authorization));
-  if (account) return { ...account, isDemo: false };
+  if (account) return { ...account, isDemo: false, auth: "sign-in" };
 
   let fromConfigParam = {};
   const encoded = searchParams?.get?.("config");
@@ -106,9 +106,9 @@ export function credentialsFromConfig(searchParams, headers = {}) {
     bearerToken(headers.authorization);
   const username = pick("username", "username", "x-3dpacking-username");
 
-  if (apiKey && username) return { apiKey, username, isDemo: false };
+  if (apiKey && username) return { apiKey, username, isDemo: false, auth: "key" };
 
-  return { ...DEMO_CREDENTIALS, isDemo: true, anonymous: !apiKey && !username };
+  return { ...DEMO_CREDENTIALS, isDemo: true, auth: "demo", anonymous: !apiKey && !username };
 }
 
 /**
@@ -296,6 +296,24 @@ export function normaliseResultUrl(url) {
  * Genuine transport faults still throw.
  */
 /**
+ * Who is asking, for 3dpack.ing's own count of assistant traffic: which MCP client
+ * (the name it gave at initialize -- "claude-ai", "openai-mcp", "claude-code"...), how
+ * it reached us, and how its caller authenticated. The API records these per call; it
+ * is how "is anyone using this through Claude or ChatGPT" became a query instead of a
+ * guess. Nothing here identifies a person the username does not already.
+ */
+export function usageHeaders({ credentials, client, via }) {
+  const clean = (value) => String(value ?? "").replace(/[^\x20-\x7e]/g, "").trim().slice(0, 100);
+  const name = client?.name ? `${client.name}${client.version ? `/${client.version}` : ""}` : "";
+  const headers = {
+    "X-3dpacking-Via": clean(via),
+    "X-3dpacking-Auth": clean(credentials?.auth ?? (credentials?.isDemo ? "demo" : "key")),
+  };
+  if (clean(name)) headers["X-3dpacking-Client"] = clean(name);
+  return headers;
+}
+
+/**
  * `coordinates` asks the API for every placement, which only the 3D view uses -- the
  * text answer is built from the summary either way. The shared demo account is
  * refused placements by design (the API answers 402 before spending anything), so it
@@ -307,6 +325,8 @@ export async function pack({
   speed,
   stability,
   credentials,
+  client,
+  via = "mcp-local",
   fetchImpl = fetch,
   timeoutMs = 120000,
   coordinates = !credentials.isDemo,
@@ -339,7 +359,7 @@ export async function pack({
     const url = coordinates ? `${ENDPOINT}${ENDPOINT.includes("?") ? "&" : "?"}coordinates` : ENDPOINT;
     response = await fetchImpl(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...usageHeaders({ credentials, client, via }) },
       body: JSON.stringify(body),
       signal: controller.signal,
     });
@@ -380,7 +400,7 @@ export async function pack({
   }
 
   if (coordinates && response.status === 402 && /coordinates/i.test(payload?.error ?? "")) {
-    return pack({ prompt, speed, stability, credentials, fetchImpl, timeoutMs, coordinates: false });
+    return pack({ prompt, speed, stability, credentials, client, via, fetchImpl, timeoutMs, coordinates: false });
   }
 
   if (!response.ok || payload.error) {

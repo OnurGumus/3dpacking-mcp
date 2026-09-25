@@ -180,7 +180,7 @@ const http = createHttpServer(async (req, res) => {
           if (transport.sessionId) sessions.delete(transport.sessionId);
         };
 
-        await createServer(credentials, KEY_SETUP_HOSTED).connect(transport);
+        await createServer(credentials, KEY_SETUP_HOSTED, "mcp-hosted").connect(transport);
         await transport.handleRequest(req, res, body);
         return;
       }
