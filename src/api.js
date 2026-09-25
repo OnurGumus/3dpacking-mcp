@@ -253,7 +253,12 @@ export function planForView(containers) {
     const key = `${item.name}|${sides.join("x")}`;
     if (!groupIndex.has(key)) {
       groupIndex.set(key, groups.length);
-      groups.push({ name: item.name || "Item", size: sides.join(" × ") });
+      // The sorted sides are only the key. Shown, they read as length × width × height,
+      // so "120 × 80, 100 tall" came out as "120 × 100 × 80" -- 80 tall. Show the first
+      // placement instead: its footprint, longer side first, then its height, which is
+      // how people give a size and how the labels on the faces read.
+      const [l, w, h] = [item.length, item.width, item.height].map(r);
+      groups.push({ name: item.name || "Item", size: [Math.max(l, w), Math.min(l, w), h].join(" × ") });
     }
     return groupIndex.get(key);
   };

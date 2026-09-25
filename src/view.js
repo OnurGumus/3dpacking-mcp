@@ -59,6 +59,10 @@ export const viewContents = (uri = VIEW_URI) => ({
         // Claude ignores them.
         "openai/widgetCSP": { connect_domains: [], resource_domains: ["https://cdn.jsdelivr.net"] },
         "openai/widgetPrefersBorder": true,
+        // ChatGPT's app directory requires a dedicated origin for a plugin with UI. Only
+        // under ChatGPT's key: the standard `ui.domain` has a host-dependent format, and
+        // Claude's is not a bare origin.
+        "openai/widgetDomain": "https://3dpack.ing",
       },
     },
   ],
