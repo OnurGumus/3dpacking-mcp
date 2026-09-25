@@ -2,9 +2,25 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "ing.3dpack/truck-load",
   "title": "3DPACK.ING — Truck Load Planning",
-  "description": "Truck & trailer load planning from a plain-English shipment: what fits, how full, 3D load plan.",
-  "version": "0.3.0",
+  "description": "Truck & trailer load planning in Claude & ChatGPT: what fits, how full, a labelled 3D plan in chat.",
+  "version": "0.4.0",
   "websiteUrl": "https://3dpack.ing",
+  "icons": [
+    {
+      "src": "https://3dpack.ing/assets/icons/mark-512.png",
+      "mimeType": "image/png",
+      "sizes": [
+        "512x512"
+      ]
+    },
+    {
+      "src": "https://3dpack.ing/assets/icons/mark.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+        "any"
+      ]
+    }
+  ],
   "repository": {
     "url": "https://github.com/OnurGumus/3dpacking-mcp",
     "source": "github"
