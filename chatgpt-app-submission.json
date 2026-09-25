@@ -24,7 +24,7 @@
   "test_cases": [
     {
       "description": "Standard pallet capacity question for a common container.",
-      "user_prompt": "How many euro pallets, 120 x 80 cm and 100 cm tall, fit in a 20 ft container?",
+      "user_prompt": "Using 3DPACK.ING, how many euro pallets, 120 x 80 cm and 100 cm tall, fit in a 20 ft container?",
       "file_attachment_urls": null,
       "tools_triggered": "pack_shipment",
       "expected_output": "Reports that 22 pallets fit in one 20 ft container (11 on the floor, stacked two high) with the volume used, shows the load in an interactive 3D view with each pallet labelled, and links to the full plan.",
@@ -32,7 +32,7 @@
     },
     {
       "description": "Mixed cargo where not everything fits, so the answer must report leftovers.",
-      "user_prompt": "Pack 40 boxes of 120 x 80 x 100 cm and 60 boxes of 60 x 40 x 50 cm into one 20 ft container.",
+      "user_prompt": "Using 3DPACK.ING, pack 40 boxes of 120 x 80 x 100 cm and 60 boxes of 60 x 40 x 50 cm into one 20 ft container.",
       "file_attachment_urls": null,
       "tools_triggered": "pack_shipment",
       "expected_output": "Reports how many of each box fit in the container and lists the boxes that did not fit; the 3D view shows the two kinds in different colours with a legend.",
@@ -40,7 +40,7 @@
     },
     {
       "description": "Choosing a container mix for a shipment that needs more than one container.",
-      "user_prompt": "I need to ship 50 crates of 120 x 100 x 100 cm. What's the best mix of 20 ft and 40 ft containers?",
+      "user_prompt": "Using 3DPACK.ING, i need to ship 50 crates of 120 x 100 x 100 cm. What's the best mix of 20 ft and 40 ft containers?",
       "file_attachment_urls": null,
       "tools_triggered": "pack_shipment",
       "expected_output": "Returns the number and type of containers needed and how full each one is; the 3D view has a pager to step through the containers.",
@@ -48,7 +48,7 @@
     },
     {
       "description": "Handling constraints: fragile cargo with a stacking limit in a named container type.",
-      "user_prompt": "Load 100 fragile boxes, 80 x 60 x 40 cm, maximum 3 high, into a 40 ft high cube container.",
+      "user_prompt": "Using 3DPACK.ING, load 100 fragile boxes, 80 x 60 x 40 cm, maximum 3 high, into a 40 ft high cube container.",
       "file_attachment_urls": null,
       "tools_triggered": "pack_shipment",
       "expected_output": "Returns a plan that respects the stacking limit, with the number of boxes loaded, the volume used, and a 3D view of the load.",
@@ -56,7 +56,7 @@
     },
     {
       "description": "Cargo that must be fully supported, using the stability setting.",
-      "user_prompt": "Pack 30 boxes of 100 x 100 x 100 cm into a 20 ft container. Nothing may overhang; every stacked box must sit fully on the one below.",
+      "user_prompt": "Using 3DPACK.ING, pack 30 boxes of 100 x 100 x 100 cm into a 20 ft container. Nothing may overhang; every stacked box must sit fully on the one below.",
       "file_attachment_urls": null,
       "tools_triggered": "pack_shipment",
       "expected_output": "Calls the tool with full support required and reports how many boxes fit under that rule, with the 3D view and a link to the full plan.",
