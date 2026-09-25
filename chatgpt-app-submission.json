@@ -48,10 +48,10 @@
     },
     {
       "description": "Handling constraints: fragile cargo with a stacking limit in a named container type.",
-      "user_prompt": "Using 3DPACK.ING, load 100 fragile boxes, 80 x 60 x 40 cm, maximum 3 high, into a 40 ft high cube container.",
+      "user_prompt": "Using 3DPACK.ING, load 30 fragile boxes, 80 x 60 x 40 cm, maximum 3 high, into a 20 ft container.",
       "file_attachment_urls": null,
       "tools_triggered": "pack_shipment",
-      "expected_output": "Returns a plan that respects the stacking limit, with the number of boxes loaded, the volume used, and a 3D view of the load.",
+      "expected_output": "Returns a plan in one 20 ft container that respects the stacking limit: the boxes are stacked, but never more than three high. Reports the number of boxes loaded and the volume used, with a 3D view of the load.",
       "expected_output_url": null
     },
     {
