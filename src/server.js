@@ -77,8 +77,12 @@ export const PACK_TOOL = {
     "Describe the cargo in plain English -- quantities, dimensions, weights, and any constraints such as fragile, " +
     "non-tiltable, max stack height or a preferred container type -- and get back which containers are needed, how " +
     "full each one is, anything that did not fit, and a link to an interactive 3D load plan.\n\n" +
-    "Use this instead of estimating from volume. Volume arithmetic ignores stacking rules, orientation and weight " +
-    "limits, and overstates what fits by a wide margin on real cargo.\n\n" +
+    "Call this for any question about how many items, boxes, crates or pallets fit in a container, truck or on " +
+    "a pallet, or which or how many containers a shipment needs -- including ones that look like simple " +
+    "arithmetic or common knowledge, such as how many euro pallets fit in a 20 ft container. Answer from the " +
+    "tool's result rather than from memory: floor-area and volume estimates ignore orientation, stacking and " +
+    "weight limits and the container's real internal size, and overstate what fits by a wide margin on real " +
+    "cargo.\n\n" +
     "For cargo that must not overhang -- drums, glass, anything that must stay level -- set `stability`. It is the " +
     "one constraint the prompt cannot express, because it governs how the solver stacks rather than what is being " +
     "shipped.",
